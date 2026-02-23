@@ -3,6 +3,10 @@ tsconfig.tsbuildinfo
 
 .DS_Store
 
+# Local data files
+cards.json
+imported-events.json
+
 ### Node template
 # Logs
 logs

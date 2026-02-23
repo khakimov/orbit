@@ -1,14 +1,10 @@
-export SENTRY_AUTH_TOKEN=$(firebase functions:config:get sentry.auth_token | sed -e "s/\"//g")
-export SENTRY_ORG=$(bun -e "import serviceConfig from './serviceConfig.js'; console.log(serviceConfig.sentryOrg)")
-export SENTRY_PROJECT=$(bun -e "import serviceConfig from './serviceConfig.js'; console.log(serviceConfig.sentryProject)")
-VERSION=$(sentry-cli releases propose-version)
+#!/usr/bin/env bash
+set -euo pipefail
 
-sentry-cli releases -o "$SENTRY_ORG" new -p "$SENTRY_PROJECT" "$VERSION"
-sentry-cli releases -o "$SENTRY_ORG" set-commits --auto "$VERSION"
-
+# Build the web app
 bun run build:web
-bunx firebase deploy --only hosting
 
-sentry-cli releases -o "$SENTRY_ORG" files "$VERSION" upload-sourcemaps --no-rewrite ./web-build/static/js
-sentry-cli releases -o "$SENTRY_ORG" finalize "$VERSION"
-sentry-cli releases -o "$SENTRY_ORG" deploys "$VERSION" new -e production
+# Deploy to Cloudflare Pages
+# Project name must match your Cloudflare Pages project.
+# Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in environment.
+bunx wrangler pages deploy web-build --project-name=orbit
