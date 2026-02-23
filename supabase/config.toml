@@ -6,3 +6,6 @@ port = 54321
 
 [functions.review-card]
 verify_jwt = false
+
+[functions.link-telegram]
+verify_jwt = false
