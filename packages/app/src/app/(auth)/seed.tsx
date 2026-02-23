@@ -7,67 +7,26 @@ import {
 } from "@withorbit/core";
 import { styles } from "@withorbit/ui";
 import { useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import React, { useState } from "react";
+import { Text, TextInput, View } from "react-native";
+import { useAuthenticationClient, useCurrentUserRecord } from "../../authentication/authContext.js";
+import { neutral, NavButton } from "../../components/PageShared.js";
+import { useDatabaseManager } from "../../hooks/useDatabaseManager.js";
 import { parseQAMarkdown } from "../../model2/parseQAMarkdown.js";
-import { DatabaseManager } from "../../model2/databaseManager.js";
 
 const { gridUnit, edgeMargin, maximumContentWidth, borderRadius } =
   styles.layout;
 
-const neutral = {
-  bg: "#f5f5f4",
-  card: "#ffffff",
-  border: "#e5e5e4",
-  text: styles.colors.ink,
-  textSoft: "rgba(0,0,0,0.45)",
-  accent: styles.colors.productKeyColor,
-};
-
-function NavButton({
-  label,
-  onPress,
-  primary,
-}: {
-  label: string;
-  onPress: () => void;
-  primary?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        backgroundColor: primary ? neutral.accent : neutral.card,
-        borderWidth: primary ? 0 : 1,
-        borderColor: neutral.border,
-        paddingHorizontal: gridUnit * 2,
-        paddingVertical: gridUnit,
-        borderRadius,
-      }}
-    >
-      <Text
-        style={[
-          styles.type.labelSmall.typeStyle,
-          { color: primary ? "#fff" : neutral.text },
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 export default function SeedPage() {
   const [markdown, setMarkdown] = useState("");
   const [status, setStatus] = useState<string | null>(null);
-  const dbRef = useRef<DatabaseManager | null>(null);
   const router = useRouter();
-
-  if (!dbRef.current) {
-    dbRef.current = new DatabaseManager();
-  }
+  const authClient = useAuthenticationClient();
+  const userRecord = useCurrentUserRecord(authClient);
+  const databaseManager = useDatabaseManager(userRecord?.userID ?? null);
 
   async function handleSeed() {
+    if (!databaseManager) return;
     const cards = parseQAMarkdown(markdown);
     if (cards.length === 0) {
       setStatus("No Q./A. pairs found.");
@@ -90,7 +49,7 @@ export default function SeedPage() {
       provenance: null,
     }));
 
-    await dbRef.current!.recordEvents(events);
+    await databaseManager.recordEvents(events);
     setStatus(`Seeded ${cards.length} card(s).`);
     setMarkdown("");
   }
@@ -105,7 +64,6 @@ export default function SeedPage() {
           flex: 1,
         }}
       >
-        {/* Header — same structure as /cards */}
         <View
           style={{
             paddingHorizontal: edgeMargin,
@@ -127,7 +85,6 @@ export default function SeedPage() {
           </View>
         </View>
 
-        {/* Content */}
         <View style={{ paddingHorizontal: edgeMargin, flex: 1 }}>
           <Text
             style={[

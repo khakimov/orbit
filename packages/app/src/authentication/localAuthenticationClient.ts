@@ -18,47 +18,17 @@ export default class LocalAuthenticationClient implements AuthenticationClient {
     return localUser;
   }
 
-  async signInWithEmailAndPassword(): Promise<unknown> {
-    return;
-  }
+  async signInWithEmailAndPassword(): Promise<void> {}
 
-  async signOut(): Promise<unknown> {
-    return;
-  }
+  async signOut(): Promise<void> {}
 
-  async createUserWithEmailAndPassword(): Promise<unknown> {
-    return;
-  }
+  async createUserWithEmailAndPassword(): Promise<void> {}
 
   async userExistsWithEmail(): Promise<boolean> {
     return true;
   }
 
   async sendPasswordResetEmail(): Promise<void> {
-    return;
-  }
-
-  async getCurrentIDToken(): Promise<unknown> {
-    return "local";
-  }
-
-  async getLoginTokenUsingSessionCookie(): Promise<unknown> {
-    return "local";
-  }
-
-  async getLoginTokenUsingIDToken(): Promise<unknown> {
-    return "local";
-  }
-
-  async getLoginTokenUsingAccessCode(): Promise<unknown> {
-    return "local";
-  }
-
-  async signInWithLoginToken(): Promise<unknown> {
-    return;
-  }
-
-  async refreshSessionCookie(): Promise<unknown> {
     return;
   }
 

@@ -29,27 +29,25 @@ import React, { useEffect, useRef, useState } from "react";
 import { NativeModules, Platform, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DatabaseManager as DatabaseManager2 } from "../model2/databaseManager.js";
+import { supabase } from "../authentication/supabaseClient.js";
 import { ReviewSessionContainer } from "../ReviewSessionContainer.js";
 import { useReviewSessionManager } from "../reviewSessionManager.js";
 import { LoadingScreen } from "./LoadingScreen.js";
 
 const { WidgetReloadBridge } = NativeModules;
 
-export function useDatabaseManager(): DatabaseManager2 | null {
+export function useDatabaseManager(userId: string): DatabaseManager2 | null {
   const [databaseManager, setDatabaseManager] =
     useState<DatabaseManager2 | null>(null);
 
-  // Close the database on unmount.
   useEffect(() => {
-    return () => {
-      databaseManager?.close();
-    };
-  }, [databaseManager]);
+    const db = new DatabaseManager2(userId, supabase);
+    setDatabaseManager(db);
 
-  // Create database manager immediately (no sync, local-only).
-  useEffect(() => {
-    setDatabaseManager(new DatabaseManager2());
-  }, []);
+    return () => {
+      db.close();
+    };
+  }, [userId]);
 
   return databaseManager;
 }
@@ -176,7 +174,7 @@ function ReviewMenuButton({
   );
 }
 
-export default function ReviewSession() {
+export default function ReviewSession({ userId }: { userId: string }) {
   const insets = useSafeAreaInsets();
   const reviewSessionStartTimestampMillis = useRef(Date.now());
 
@@ -191,7 +189,7 @@ export default function ReviewSession() {
     ...reviewSessionManager
   } = useReviewSessionManager();
 
-  const databaseManager = useDatabaseManager();
+  const databaseManager = useDatabaseManager(userId);
   const initialQueue = useReviewItemQueue(databaseManager);
 
   // When the initial queue becomes available, add it to the review session manager.

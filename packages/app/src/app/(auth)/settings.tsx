@@ -1,9 +1,6 @@
 import { Link, Spacer, styles } from "@withorbit/ui";
 import React from "react";
-import { Platform, Text, View } from "react-native";
-import serviceConfig from "../../../serviceConfig.js";
-import { useAuthenticationClient } from "../../authentication/authContext.js";
-import { useEmbeddedAuthenticationState } from "../../embedded/useEmbeddedAuthenticationState.js";
+import { Text, View } from "react-native";
 
 const Unsubscribe = () => (
   <>
@@ -27,60 +24,6 @@ const Problem = () => (
   </>
 );
 
-// TODO: extract, generalize
-async function requestPersonalAccessToken(
-  idToken: unknown,
-): Promise<string> {
-  const request = new Request(
-    `${serviceConfig.httpsAPIBaseURLString}/internal/auth/personalAccessTokens`,
-    { method: "POST", headers: { Authorization: `ID ${idToken}` } },
-  );
-
-  const fetchResult = await fetch(request);
-  if (fetchResult.ok) {
-    const response = await fetchResult.json();
-    return response.token;
-  } else {
-    throw new Error(
-      `Couldn't generate personal access token ${
-        fetchResult.status
-      }: ${await fetchResult.text()}`,
-    );
-  }
-}
-
-const GeneratePersonalAccessToken = () => {
-  const [token, setToken] = React.useState<string | null>(null);
-  const authenticationClient = useAuthenticationClient();
-  const authenticationState =
-    useEmbeddedAuthenticationState(authenticationClient);
-
-  React.useEffect(() => {
-    if (authenticationState.status === "signedIn") {
-      authenticationClient.getCurrentIDToken().then(async (idToken) => {
-        const personalAccessToken = await requestPersonalAccessToken(idToken);
-        setToken(personalAccessToken);
-      });
-    } else if (authenticationState.status === "signedOut") {
-      if (Platform.OS === "web") {
-        // TODO: extract routing functionality
-        location.href = `/login?continue=${encodeURIComponent(location.href)}`;
-      }
-    }
-  }, [authenticationClient, authenticationState]);
-
-  if (token) {
-    return (
-      <>{`Your personal access token:
-${token}
-
-Treat this like a password: anyone who has this token can access your account.`}</>
-    );
-  } else {
-    return <>One moment…</>;
-  }
-};
-
 const palette = styles.colors.palettes.lime;
 export default function SettingsPage() {
   const { message, headline } = React.useMemo(() => {
@@ -93,14 +36,7 @@ export default function SettingsPage() {
       case "snooze1Week":
         return { message: <Snooze />, headline: "Got it." };
       default:
-        if (params.get("action") === "generatePersonalAccessToken") {
-          return {
-            message: <GeneratePersonalAccessToken />,
-            headline: "Personal access token",
-          };
-        } else {
-          return { message: <Problem />, headline: "Hm..." };
-        }
+        return { message: <Problem />, headline: "Hm..." };
     }
   }, []);
 

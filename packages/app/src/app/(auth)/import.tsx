@@ -1,67 +1,26 @@
 import { Event } from "@withorbit/core";
 import { styles } from "@withorbit/ui";
 import { useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
-import { DatabaseManager } from "../../model2/databaseManager.js";
+import React, { useState } from "react";
+import { Text, TextInput, View } from "react-native";
+import { useAuthenticationClient, useCurrentUserRecord } from "../../authentication/authContext.js";
+import { neutral, NavButton } from "../../components/PageShared.js";
+import { useDatabaseManager } from "../../hooks/useDatabaseManager.js";
 
 const { gridUnit, edgeMargin, maximumContentWidth, borderRadius } =
   styles.layout;
-
-const neutral = {
-  bg: "#f5f5f4",
-  card: "#ffffff",
-  border: "#e5e5e4",
-  text: styles.colors.ink,
-  textSoft: "rgba(0,0,0,0.45)",
-  accent: styles.colors.productKeyColor,
-};
-
-function NavButton({
-  label,
-  onPress,
-  primary,
-}: {
-  label: string;
-  onPress: () => void;
-  primary?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        backgroundColor: primary ? neutral.accent : neutral.card,
-        borderWidth: primary ? 0 : 1,
-        borderColor: neutral.border,
-        paddingHorizontal: gridUnit * 2,
-        paddingVertical: gridUnit,
-        borderRadius,
-      }}
-    >
-      <Text
-        style={[
-          styles.type.labelSmall.typeStyle,
-          { color: primary ? "#fff" : neutral.text },
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
 
 export default function ImportPage() {
   const [token, setToken] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const dbRef = useRef<DatabaseManager | null>(null);
   const router = useRouter();
-
-  if (!dbRef.current) {
-    dbRef.current = new DatabaseManager();
-  }
+  const authClient = useAuthenticationClient();
+  const userRecord = useCurrentUserRecord(authClient);
+  const databaseManager = useDatabaseManager(userRecord?.userID ?? null);
 
   async function handleImport() {
+    if (!databaseManager) return;
     const authToken = token.trim();
     if (!authToken) {
       setStatus("Paste your ID token from the Authorization header.");
@@ -76,10 +35,10 @@ export default function ImportPage() {
       let afterID: string | null = null;
 
       while (true) {
-        const url =
+        const url: string =
           "https://withorbit.com/api/events?limit=100" +
-          (afterID ? `&afterID=${afterID}` : "");
-        const resp = await fetch(url, {
+          (afterID ? `&afterID=${encodeURIComponent(afterID)}` : "");
+        const resp: Response = await fetch(url, {
           headers: {
             Authorization: `ID ${authToken}`,
             Accept: "application/json",
@@ -87,13 +46,13 @@ export default function ImportPage() {
         });
 
         if (!resp.ok) {
-          setStatus(`API error: ${resp.status}. Token may be expired.`);
+          setStatus(`API error: ${resp.status}. The legacy API may be offline.`);
           setImporting(false);
           return;
         }
 
-        const data = await resp.json();
-        const items = data.items || [];
+        const data: { items?: Event[]; hasMore?: boolean } = await resp.json();
+        const items: Event[] = data.items || [];
         allEvents.push(...items);
         setStatus(`Fetched ${allEvents.length} events...`);
 
@@ -108,12 +67,12 @@ export default function ImportPage() {
       }
 
       setStatus(`Writing ${allEvents.length} events to local store...`);
-      await dbRef.current!.recordEvents(allEvents);
+      await databaseManager.recordEvents(allEvents);
       setStatus(
         `Imported ${allEvents.length} events. Go to All Cards to see them.`,
       );
-    } catch (err: any) {
-      setStatus(`Error: ${err.message}`);
+    } catch (err: unknown) {
+      setStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setImporting(false);
     }
@@ -129,7 +88,6 @@ export default function ImportPage() {
           flex: 1,
         }}
       >
-        {/* Header */}
         <View
           style={{
             paddingHorizontal: edgeMargin,
@@ -154,8 +112,17 @@ export default function ImportPage() {
           </View>
         </View>
 
-        {/* Content */}
         <View style={{ paddingHorizontal: edgeMargin, flex: 1 }}>
+          <Text
+            style={[
+              styles.type.runningTextSmall.typeStyle,
+              { color: neutral.accent, marginBottom: gridUnit },
+            ]}
+          >
+            Note: The legacy Orbit API may be offline. This page is for
+            one-time migration of existing data.
+          </Text>
+
           <Text
             style={[
               styles.type.runningTextSmall.typeStyle,

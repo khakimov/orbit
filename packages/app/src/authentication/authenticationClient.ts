@@ -3,30 +3,22 @@ export interface UserRecord {
   emailAddress: string | null;
 }
 
-export interface AuthenticationClient<LoginToken = unknown, IDToken = unknown> {
+export interface AuthenticationClient {
   subscribeToUserAuthState(
     callback: (userRecord: UserRecord | null) => void,
   ): () => void;
   getUserAuthState(): Promise<UserRecord | null>;
 
-  signInWithEmailAndPassword(email: string, password: string): Promise<unknown>;
-  signOut(): Promise<unknown>;
+  signInWithEmailAndPassword(email: string, password: string): Promise<void>;
+  signOut(): Promise<void>;
 
   createUserWithEmailAndPassword(
     email: string,
     password: string,
-  ): Promise<unknown>;
+  ): Promise<void>;
 
   userExistsWithEmail(email: string): Promise<boolean>;
   sendPasswordResetEmail(email: string): Promise<void>;
-
-  getCurrentIDToken(): Promise<IDToken>;
-
-  getLoginTokenUsingSessionCookie(): Promise<LoginToken>;
-  getLoginTokenUsingIDToken(IDToken: IDToken): Promise<LoginToken>;
-  getLoginTokenUsingAccessCode(accessCode: string): Promise<LoginToken>;
-  signInWithLoginToken(loginToken: LoginToken): Promise<unknown>;
-  refreshSessionCookie(IDToken: IDToken): Promise<unknown>;
 
   supportsCredentialPersistence(): Promise<boolean>;
 }

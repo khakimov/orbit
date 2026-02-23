@@ -39,10 +39,9 @@ export class FirebaseOpaqueIDToken {
   }
 }
 
-export default class FirebaseAuthenticationClient
-  implements
-    AuthenticationClient<FirebaseOpaqueLoginToken, FirebaseOpaqueIDToken>
-{
+// Legacy: no longer implements AuthenticationClient (interface was slimmed).
+// Will be removed in Phase 3 cleanup.
+export default class FirebaseAuthenticationClient {
   private _auth: FirebaseAuth; // access through auth()
   private authConfigurationPromise: Promise<void>;
 

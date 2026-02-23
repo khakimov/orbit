@@ -1,4 +1,4 @@
-import OrbitAPIClient from "@withorbit/api-client";
+import { SupabaseClient } from "@supabase/supabase-js";
 import {
   AttachmentID,
   createReviewQueue,
@@ -9,29 +9,30 @@ import {
   Task,
 } from "@withorbit/core";
 import { OrbitStore } from "@withorbit/store-shared";
-import { APISyncAdapter, syncOrbitStore } from "@withorbit/sync";
-import { createDefaultOrbitStore } from "./orbitStoreFactory.js";
+import { SupabaseSyncAdapter } from "../sync/supabaseSyncAdapter.js";
+import { createOrbitStore } from "./orbitStoreFactory.js";
+
+const LAST_SYNC_KEY = "supabase_last_sync_at";
 
 export class DatabaseManager {
   private readonly _storePromise: Promise<OrbitStore>;
+  private readonly _syncAdapter: SupabaseSyncAdapter | null;
+  private _pullPromise: Promise<void> | null = null;
 
-  private readonly _apiClient?: OrbitAPIClient;
-  private readonly _apiSyncAdapter?: APISyncAdapter;
-  private _syncPromise: Promise<void> | null = null;
+  constructor(userId: string, supabase?: SupabaseClient) {
+    this._storePromise = createOrbitStore(`orbitStore.${userId}`);
 
-  constructor(apiClient?: OrbitAPIClient) {
-    this._storePromise = createDefaultOrbitStore(); // TODO: namespace the store by user ID
-
-    if (apiClient) {
-      this._apiClient = apiClient;
-      this._apiSyncAdapter = new APISyncAdapter(this._apiClient, "server");
-      this._startSync();
+    if (supabase) {
+      this._syncAdapter = new SupabaseSyncAdapter(supabase, userId);
+      this._pullPromise = this._pullFromRemote();
+    } else {
+      this._syncAdapter = null;
     }
   }
 
   async fetchReviewQueue(): Promise<ReviewItem[]> {
-    // TODO: implement an approach more resilient to network failures... probably sync status should be separately exported and displayed.
-    await this._syncPromise;
+    // Wait for initial pull to complete before building the queue.
+    await this._pullPromise;
 
     const store = await this._storePromise;
     const thresholdTimestampMillis = getReviewQueueFuzzyDueTimestampThreshold();
@@ -45,24 +46,25 @@ export class DatabaseManager {
   }
 
   async close(): Promise<void> {
-    // TODO: cancel sync... which requires implementing cancellation in @withorbit/sync...
-
     const store = await this._storePromise;
     await store.database.close();
   }
 
   async recordEvents(events: Event[]): Promise<void> {
+    // Always write locally first.
     const store = await this._storePromise;
     await store.database.putEvents(events);
 
-    if (this._apiSyncAdapter) {
-      this._startSync();
+    // Fire-and-forget push to Supabase.
+    if (this._syncAdapter) {
+      this._syncAdapter.pushEvents(events).catch((error) => {
+        console.error("[Sync] Push failed:", error);
+      });
     }
   }
 
   async listAllCards(): Promise<Task[]> {
     const store = await this._storePromise;
-    // Use a far-future due timestamp to match all cards.
     return store.database.listEntities<Task>({
       entityType: EntityType.Task,
       limit: 1000,
@@ -77,22 +79,34 @@ export class DatabaseManager {
     return store.attachmentStore.getURLForStoredAttachment(attachmentID);
   }
 
-  private _startSync() {
-    // TODO: instead of just dropping the request, debounce and enqueue
-    if (this._syncPromise === null) {
-      console.info("[Sync] Starting...");
-      this._syncPromise = this._storePromise.then((store) =>
-        syncOrbitStore({ source: store, destination: this._apiSyncAdapter! })
-          .then(() => {
-            console.info("[Sync] Sync completed.");
-          })
-          .catch((error) => {
-            console.error("[Sync] Sync failed: ", error);
-          })
-          .finally(() => {
-            this._syncPromise = null;
-          }),
-      );
+  private async _pullFromRemote(): Promise<void> {
+    if (!this._syncAdapter) return;
+
+    try {
+      const store = await this._storePromise;
+      const lastSyncAt = await store.database.getMetadataValues([
+        LAST_SYNC_KEY,
+      ]);
+      const cursor = lastSyncAt.get(LAST_SYNC_KEY) ?? null;
+
+      console.info("[Sync] Pulling events since:", cursor ?? "beginning");
+      const { events, latestCreatedAt } =
+        await this._syncAdapter.pullEvents(cursor);
+
+      if (events.length > 0) {
+        await store.database.putEvents(events);
+        console.info(`[Sync] Pulled ${events.length} events.`);
+      }
+
+      if (latestCreatedAt) {
+        await store.database.setMetadataValues(
+          new Map([[LAST_SYNC_KEY, latestCreatedAt]]),
+        );
+      }
+    } catch (error) {
+      // Pull failure is non-fatal: we proceed with local data.
+      // No retry for MVP — next app load will attempt again.
+      console.error("[Sync] Pull failed:", error);
     }
   }
 }
