@@ -1,8 +1,16 @@
-import { QATaskContent, Task, TaskContentType } from "@withorbit/core";
+import {
+  EventType,
+  generateUniqueID,
+  QATaskContent,
+  Task,
+  TaskContentType,
+  TaskID,
+  TaskUpdateDeletedEvent,
+} from "@withorbit/core";
 import { styles } from "@withorbit/ui";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { useAuthenticationClient, useCurrentUserRecord } from "../../authentication/authContext.js";
 import { neutral, NavButton } from "../../components/PageShared.js";
 import { useDatabaseManager } from "../../hooks/useDatabaseManager.js";
@@ -17,7 +25,15 @@ function formatDate(ms: number): string {
   });
 }
 
-function CardRow({ task }: { task: Task }) {
+function CardRow({
+  task,
+  onEdit,
+  onDelete,
+}: {
+  task: Task;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const content = task.spec.content;
   const componentState = Object.values(task.componentStates)[0];
   const isDue = componentState
@@ -56,15 +72,29 @@ function CardRow({ task }: { task: Task }) {
         {answer}
       </Text>
       <View style={{ height: gridUnit }} />
-      <Text style={[styles.type.labelTiny.typeStyle, { color: neutral.textSoft }]}>
-        {isDue
-          ? "Due now"
-          : `Due ${formatDate(componentState?.dueTimestampMillis ?? 0)}`}
-        {"  ·  "}
-        {componentState?.lastRepetitionTimestampMillis
-          ? `Reviewed ${formatDate(componentState.lastRepetitionTimestampMillis)}`
-          : "New"}
-      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Text style={[styles.type.labelTiny.typeStyle, { color: neutral.textSoft }]}>
+          {isDue
+            ? "Due now"
+            : `Due ${formatDate(componentState?.dueTimestampMillis ?? 0)}`}
+          {"  \u00B7  "}
+          {componentState?.lastRepetitionTimestampMillis
+            ? `Reviewed ${formatDate(componentState.lastRepetitionTimestampMillis)}`
+            : "New"}
+        </Text>
+        <View style={{ flexDirection: "row", gap: gridUnit }}>
+          <Pressable onPress={onEdit}>
+            <Text style={[styles.type.labelTiny.typeStyle, { color: neutral.accent }]}>
+              Edit
+            </Text>
+          </Pressable>
+          <Pressable onPress={onDelete}>
+            <Text style={[styles.type.labelTiny.typeStyle, { color: "#dc2626" }]}>
+              Delete
+            </Text>
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }
@@ -76,9 +106,40 @@ export default function CardsPage() {
   const userRecord = useCurrentUserRecord(authClient);
   const databaseManager = useDatabaseManager(userRecord?.userID ?? null);
 
-  useEffect(() => {
+  const loadCards = useCallback(() => {
     databaseManager?.listAllCards().then(setCards);
   }, [databaseManager]);
+
+  useEffect(() => {
+    loadCards();
+  }, [loadCards]);
+
+  async function handleDelete(taskId: TaskID) {
+    if (!databaseManager) return;
+    const event: TaskUpdateDeletedEvent = {
+      id: generateUniqueID(),
+      type: EventType.TaskUpdateDeleted,
+      entityID: taskId,
+      timestampMillis: Date.now(),
+      isDeleted: true,
+    };
+    await databaseManager.recordEvents([event]);
+    setCards((prev) => prev?.filter((c) => c.id !== taskId) ?? null);
+  }
+
+  function handleEdit(task: Task) {
+    const content = task.spec.content;
+    if (content.type !== TaskContentType.QA) return;
+    const qa = content as QATaskContent;
+    router.push({
+      pathname: "/cards/add",
+      params: {
+        editId: task.id,
+        editQuestion: qa.body.text,
+        editAnswer: qa.answer.text,
+      },
+    });
+  }
 
   const dueCount = cards?.filter(
     (c) =>
@@ -152,7 +213,14 @@ export default function CardsPage() {
               No cards yet. Tap "Add" to seed some.
             </Text>
           ) : (
-            cards.map((task) => <CardRow key={task.id} task={task} />)
+            cards.map((task) => (
+              <CardRow
+                key={task.id}
+                task={task}
+                onEdit={() => handleEdit(task)}
+                onDelete={() => handleDelete(task.id as TaskID)}
+              />
+            ))
           )}
         </ScrollView>
       </View>

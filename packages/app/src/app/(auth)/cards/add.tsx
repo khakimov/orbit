@@ -9,10 +9,11 @@ import {
   TaskID,
   TaskIngestEvent,
   TaskSpecType,
+  TaskUpdateSpecEvent,
 } from "@withorbit/core";
 import { PromptFieldRenderer, styles } from "@withorbit/ui";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -86,8 +87,15 @@ async function fetchImageBytes(uri: string): Promise<Uint8Array> {
 }
 
 export default function AddCardPage() {
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
+  const params = useLocalSearchParams<{
+    editId?: string;
+    editQuestion?: string;
+    editAnswer?: string;
+  }>();
+  const editId = params.editId as TaskID | undefined;
+
+  const [question, setQuestion] = useState(params.editQuestion ?? "");
+  const [answer, setAnswer] = useState(params.editAnswer ?? "");
   const [image, setImage] = useState<PickedImage | null>(null);
   const [context, setContext] = useState("");
   const [saving, setSaving] = useState(false);
@@ -119,6 +127,19 @@ export default function AddCardPage() {
       }
     } catch {}
   }, []);
+
+  // Warn before navigating away with unsaved content
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const hasUnsaved = question.trim().length > 0 || answer.trim().length > 0;
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!hasUnsaved) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [question, answer]);
 
   const router = useRouter();
   const authClient = useAuthenticationClient();
@@ -185,7 +206,7 @@ export default function AddCardPage() {
     setSaving(true);
 
     try {
-      const events: (TaskIngestEvent | AttachmentIngestEvent)[] = [];
+      const events: (TaskIngestEvent | AttachmentIngestEvent | TaskUpdateSpecEvent)[] = [];
       const attachments: AttachmentID[] = [];
 
       if (image) {
@@ -203,31 +224,50 @@ export default function AddCardPage() {
         attachments.push(attachmentID);
       }
 
-      const taskIngestEvent: TaskIngestEvent = {
-        id: generateUniqueID(),
-        type: EventType.TaskIngest as const,
-        entityID: generateUniqueID<TaskID>(),
-        timestampMillis: Date.now(),
-        spec: {
-          type: TaskSpecType.Memory,
-          content: {
-            type: TaskContentType.QA,
-            body: { text: question.trim(), attachments },
-            answer: { text: answer.trim(), attachments: [] },
-          },
+      const spec = {
+        type: TaskSpecType.Memory as const,
+        content: {
+          type: TaskContentType.QA as const,
+          body: { text: question.trim(), attachments },
+          answer: { text: answer.trim(), attachments: [] as AttachmentID[] },
         },
-        provenance: null,
       };
-      events.push(taskIngestEvent);
+
+      if (editId) {
+        const updateEvent: TaskUpdateSpecEvent = {
+          id: generateUniqueID(),
+          type: EventType.TaskUpdateSpecEvent,
+          entityID: editId,
+          timestampMillis: Date.now(),
+          spec,
+        };
+        events.push(updateEvent);
+      } else {
+        const taskIngestEvent: TaskIngestEvent = {
+          id: generateUniqueID(),
+          type: EventType.TaskIngest as const,
+          entityID: generateUniqueID<TaskID>(),
+          timestampMillis: Date.now(),
+          spec,
+          provenance: null,
+        };
+        events.push(taskIngestEvent);
+      }
 
       await databaseManager.recordEvents(events);
-      setQuestion("");
-      setAnswer("");
-      setImage(null);
-      if (!contextPinned) setContext("");
-      setReview(null);
-      setReviewError(null);
-      showToast("Saved!");
+
+      if (editId) {
+        showToast("Updated!");
+        router.back();
+      } else {
+        setQuestion("");
+        setAnswer("");
+        setImage(null);
+        if (!contextPinned) setContext("");
+        setReview(null);
+        setReviewError(null);
+        showToast("Saved!");
+      }
     } catch (error) {
       console.error("Failed to save card:", error);
       showToast("Save failed. Check console.", 3000);
@@ -279,7 +319,7 @@ export default function AddCardPage() {
           <Text
             style={[styles.type.headline.layoutStyle, { color: neutral.text }]}
           >
-            Add Card
+            {editId ? "Edit Card" : "Add Card"}
           </Text>
           <View style={{ flexDirection: "row", gap: gridUnit }}>
             <NavButton label="All Cards" onPress={() => router.push("/cards")} />
@@ -448,10 +488,10 @@ export default function AddCardPage() {
               }}
             >
               <NavButton
-                label={saving ? "Saving..." : "Save Card"}
+                label={saving ? "Saving..." : editId ? "Update Card" : "Save Card"}
                 onPress={handleSave}
                 primary
-                disabled={!databaseManager || saving || reviewing}
+                disabled={!databaseManager || saving}
               />
               <NavButton
                 label={reviewing ? "Reviewing..." : "Review with AI"}
