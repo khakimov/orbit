@@ -1,0 +1,21 @@
+{
+  "sources": [
+    {
+      "identifier": "local-cards",
+      "title": "My Cards",
+      "items": [
+        {
+          "identifier": "chicken-stock-ratio",
+          "spec": {
+            "type": "memory",
+            "content": {
+              "type": "qa",
+              "body": { "text": "What's the ratio of chicken bones to water in chicken stock?", "attachments": [] },
+              "answer": { "text": "A quart of water per pound of bones", "attachments": [] }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

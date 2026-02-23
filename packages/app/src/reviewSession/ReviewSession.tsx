@@ -28,22 +28,14 @@ import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { NativeModules, Platform, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AuthenticationClient } from "../authentication/index.js";
-import {
-  useAuthenticationClient,
-  useCurrentUserRecord,
-} from "../authentication/authContext.js";
 import { DatabaseManager as DatabaseManager2 } from "../model2/databaseManager.js";
 import { ReviewSessionContainer } from "../ReviewSessionContainer.js";
 import { useReviewSessionManager } from "../reviewSessionManager.js";
-import { useAPIClient } from "../util/useAPIClient.js";
 import { LoadingScreen } from "./LoadingScreen.js";
 
 const { WidgetReloadBridge } = NativeModules;
 
-export function useDatabaseManager(
-  authenticationClient: AuthenticationClient,
-): DatabaseManager2 | null {
+export function useDatabaseManager(): DatabaseManager2 | null {
   const [databaseManager, setDatabaseManager] =
     useState<DatabaseManager2 | null>(null);
 
@@ -54,15 +46,10 @@ export function useDatabaseManager(
     };
   }, [databaseManager]);
 
-  // Once we're signed in, create the database manager.
-  // TODO handle switching users etc
-  const userRecord = useCurrentUserRecord(authenticationClient);
-  const apiClient = useAPIClient(authenticationClient);
+  // Create database manager immediately (no sync, local-only).
   useEffect(() => {
-    if (userRecord) {
-      setDatabaseManager(new DatabaseManager2(apiClient));
-    }
-  }, [userRecord, apiClient]);
+    setDatabaseManager(new DatabaseManager2());
+  }, []);
 
   return databaseManager;
 }
@@ -94,7 +81,7 @@ function persistMarking({
     .recordEvents([event])
     .then(() => {
       console.log("[Performance] Log written", Date.now() / 1000.0);
-      WidgetReloadBridge.reloadTimelines();
+      WidgetReloadBridge?.reloadTimelines();
     })
     .catch((error) => {
       console.error("Couldn't commit", reviewItem.task.id, error);
@@ -204,8 +191,7 @@ export default function ReviewSession() {
     ...reviewSessionManager
   } = useReviewSessionManager();
 
-  const authenticationClient = useAuthenticationClient();
-  const databaseManager = useDatabaseManager(authenticationClient);
+  const databaseManager = useDatabaseManager();
   const initialQueue = useReviewItemQueue(databaseManager);
 
   // When the initial queue becomes available, add it to the review session manager.
@@ -307,7 +293,7 @@ export default function ReviewSession() {
       ])
       .then(() => {
         console.log("Wrote delete event", Date.now() / 1000.0);
-        WidgetReloadBridge.reloadTimelines();
+        WidgetReloadBridge?.reloadTimelines();
       })
       .catch((error) => {
         console.error("Couldn't commit delete event", error);

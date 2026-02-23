@@ -15,16 +15,18 @@ import { createDefaultOrbitStore } from "./orbitStoreFactory.js";
 export class DatabaseManager {
   private readonly _storePromise: Promise<OrbitStore>;
 
-  private readonly _apiClient: OrbitAPIClient;
-  private readonly _apiSyncAdapter: APISyncAdapter;
+  private readonly _apiClient?: OrbitAPIClient;
+  private readonly _apiSyncAdapter?: APISyncAdapter;
   private _syncPromise: Promise<void> | null = null;
 
-  constructor(apiClient: OrbitAPIClient) {
-    this._apiClient = apiClient;
+  constructor(apiClient?: OrbitAPIClient) {
     this._storePromise = createDefaultOrbitStore(); // TODO: namespace the store by user ID
-    this._apiSyncAdapter = new APISyncAdapter(this._apiClient, "server");
 
-    this._startSync();
+    if (apiClient) {
+      this._apiClient = apiClient;
+      this._apiSyncAdapter = new APISyncAdapter(this._apiClient, "server");
+      this._startSync();
+    }
   }
 
   async fetchReviewQueue(): Promise<ReviewItem[]> {
@@ -53,7 +55,19 @@ export class DatabaseManager {
     const store = await this._storePromise;
     await store.database.putEvents(events);
 
-    this._startSync();
+    if (this._apiSyncAdapter) {
+      this._startSync();
+    }
+  }
+
+  async listAllCards(): Promise<Task[]> {
+    const store = await this._storePromise;
+    // Use a far-future due timestamp to match all cards.
+    return store.database.listEntities<Task>({
+      entityType: EntityType.Task,
+      limit: 1000,
+      predicate: ["dueTimestampMillis", "<=", Number.MAX_SAFE_INTEGER],
+    });
   }
 
   async getURLForAttachmentID(
@@ -68,7 +82,7 @@ export class DatabaseManager {
     if (this._syncPromise === null) {
       console.info("[Sync] Starting...");
       this._syncPromise = this._storePromise.then((store) =>
-        syncOrbitStore({ source: store, destination: this._apiSyncAdapter })
+        syncOrbitStore({ source: store, destination: this._apiSyncAdapter! })
           .then(() => {
             console.info("[Sync] Sync completed.");
           })

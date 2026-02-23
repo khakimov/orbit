@@ -2,7 +2,6 @@ import { Link, Spacer, styles } from "@withorbit/ui";
 import React from "react";
 import { Platform, Text, View } from "react-native";
 import serviceConfig from "../../../serviceConfig.js";
-import { FirebaseOpaqueIDToken } from "../../authentication/index.js";
 import { useAuthenticationClient } from "../../authentication/authContext.js";
 import { useEmbeddedAuthenticationState } from "../../embedded/useEmbeddedAuthenticationState.js";
 
@@ -30,7 +29,7 @@ const Problem = () => (
 
 // TODO: extract, generalize
 async function requestPersonalAccessToken(
-  idToken: FirebaseOpaqueIDToken,
+  idToken: unknown,
 ): Promise<string> {
   const request = new Request(
     `${serviceConfig.httpsAPIBaseURLString}/internal/auth/personalAccessTokens`,

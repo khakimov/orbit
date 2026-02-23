@@ -16,12 +16,27 @@ interface TypeSpec {
   bottomShift: number;
 }
 
-const boldFontNameTable: { [key: string]: string } = {
-  "Dr-Light": "Dr-Regular",
-  "Dr-Regular": "Dr-Bold",
-  "Dr-Medium": "Dr-ExtraBold",
-  "Dr-Bold": "Dr-ExtraBold",
-  "Dr-ExtraBold": "Dr-ExtraBold",
+// Sans-serif font for UI elements (prompts, headlines, labels).
+const sansFamily = "Inter";
+// Serif font for body/running text.
+const serifFamily = "'Source Serif 4'";
+
+// Weight mapping: Dr-Light=300, Dr-Regular=400, Dr-Medium=500, Dr-Bold=700, Dr-ExtraBold=800
+type WeightName = "light" | "regular" | "medium" | "bold" | "extraBold";
+const weightValues: Record<WeightName, TextStyle["fontWeight"]> = {
+  light: "300",
+  regular: "400",
+  medium: "500",
+  bold: "700",
+  extraBold: "800",
+};
+
+const boldWeightTable: Record<WeightName, WeightName> = {
+  light: "regular",
+  regular: "bold",
+  medium: "extraBold",
+  bold: "extraBold",
+  extraBold: "extraBold",
 };
 
 export function getVariantStyles(
@@ -29,27 +44,36 @@ export function getVariantStyles(
   isBold: boolean,
   isItalic: boolean,
 ): Partial<TextStyle> {
-  let workingFontName = isBold ? boldFontNameTable[baseFontName] : baseFontName;
-  if (!workingFontName) {
-    throw new Error(`Unknown font name ${baseFontName}`);
+  // Map legacy Dr-* font names to weight names for backward compatibility.
+  const fontNameToWeight: Record<string, WeightName> = {
+    [sansFamily]: "regular",
+    "Dr-Light": "light",
+    "Dr-Regular": "regular",
+    "Dr-Medium": "medium",
+    "Dr-Bold": "bold",
+    "Dr-ExtraBold": "extraBold",
+  };
+
+  const baseWeight = fontNameToWeight[baseFontName];
+  if (baseWeight) {
+    const targetWeight = isBold ? boldWeightTable[baseWeight] : baseWeight;
+    return {
+      fontFamily: sansFamily,
+      fontWeight: weightValues[targetWeight],
+      fontStyle: isItalic ? "italic" : "normal",
+      // When we can't bold any further, use a darker ink.
+      ...(baseWeight === "bold" || baseWeight === "extraBold"
+        ? isBold
+          ? { color: "black" }
+          : {}
+        : {}),
+    };
   }
 
-  if (isItalic) {
-    if (workingFontName === "Dr-Regular") {
-      workingFontName = "Dr-Italic";
-    } else {
-      workingFontName += "Italic";
-    }
-  }
-
+  // Serif font — no weight manipulation needed.
   return {
-    fontFamily: workingFontName,
-    // When we can't bold any further, use a darker ink.
-    ...(baseFontName.includes("Bold") && isBold && { color: "black" }),
-    // This requires some explanation. Rather than asking the platform to choose the font (i.e. "Dr-Bold" or "Dr-MediumItalic") based on fontWeight and fontStyle, we're explicitly compute the desired font name ("Dr-ExtraBoldItalic") and specify no fontWeight or fontStyle to the system. We do this because platforms' algorithms for mapping family/weight/style (i.e. "Dr"/700/italic) to font names ("Dr-BoldItalic") are inconsistent and heuristic-based.
-    // So... why do we need to do anything at all here? Isn't undefined the default value? Well, when we render text elements, we use the *inherited* style to compute the desired font name. If the node tree looks like <em><text>value</text></em>, the inherited style will include { fontVariant: "italic" }. We need that information to call this function with the correct value, but now we'll suppress it before passing the text styles off the to the platform.
-    fontWeight: undefined,
-    fontStyle: undefined,
+    fontFamily: serifFamily,
+    fontStyle: isItalic ? "italic" : "normal",
   };
 }
 
@@ -94,7 +118,8 @@ function makeTypeSpec(
 export const promptXXLarge = makeTypeSpec(
   {
     fontSize: 96,
-    fontFamily: "Dr-Light",
+    fontFamily: sansFamily,
+    fontWeight: "300",
     lineHeight: 84,
     letterSpacing: 96 * -0.025,
   },
@@ -106,7 +131,8 @@ export const promptXXLarge = makeTypeSpec(
 export const promptXLarge = makeTypeSpec(
   {
     fontSize: 60,
-    fontFamily: "Dr-Light",
+    fontFamily: sansFamily,
+    fontWeight: "300",
     lineHeight: 56,
     letterSpacing: 60 * -0.015,
   },
@@ -118,7 +144,8 @@ export const promptXLarge = makeTypeSpec(
 export const promptLarge = makeTypeSpec(
   {
     fontSize: 36,
-    fontFamily: "Dr-Regular",
+    fontFamily: sansFamily,
+    fontWeight: "400",
     lineHeight: 36,
     letterSpacing: 0,
   },
@@ -130,7 +157,8 @@ export const promptLarge = makeTypeSpec(
 export const promptMedium = makeTypeSpec(
   {
     fontSize: 24,
-    fontFamily: "Dr-Medium",
+    fontFamily: sansFamily,
+    fontWeight: "500",
     lineHeight: 24,
     letterSpacing: 24 * 0.01,
   },
@@ -142,7 +170,8 @@ export const promptMedium = makeTypeSpec(
 export const promptSmall = makeTypeSpec(
   {
     fontSize: 18,
-    fontFamily: "Dr-Medium",
+    fontFamily: sansFamily,
+    fontWeight: "500",
     lineHeight: 20,
     letterSpacing: 16 * 0.02,
   },
@@ -154,7 +183,8 @@ export const promptSmall = makeTypeSpec(
 export const title = makeTypeSpec(
   {
     fontSize: 48,
-    fontFamily: "Dr-Medium",
+    fontFamily: sansFamily,
+    fontWeight: "500",
     lineHeight: 40,
     letterSpacing: 48 * -0.03,
   },
@@ -166,7 +196,8 @@ export const title = makeTypeSpec(
 export const headline = makeTypeSpec(
   {
     fontSize: 36,
-    fontFamily: "Dr-Bold",
+    fontFamily: sansFamily,
+    fontWeight: "700",
     lineHeight: 32,
     letterSpacing: 0,
   },
@@ -178,7 +209,8 @@ export const headline = makeTypeSpec(
 export const label = makeTypeSpec(
   {
     fontSize: 24,
-    fontFamily: "Dr-Bold",
+    fontFamily: sansFamily,
+    fontWeight: "700",
     lineHeight: 24,
     letterSpacing: 24 * 0.02,
   },
@@ -190,7 +222,8 @@ export const label = makeTypeSpec(
 export const labelSmall = makeTypeSpec(
   {
     fontSize: 17,
-    fontFamily: "Dr-ExtraBold",
+    fontFamily: sansFamily,
+    fontWeight: "800",
     lineHeight: 20,
     letterSpacing: 17 * 0.01,
   },
@@ -202,7 +235,8 @@ export const labelSmall = makeTypeSpec(
 export const labelTiny = makeTypeSpec(
   {
     fontSize: 12,
-    fontFamily: "Dr-ExtraBold",
+    fontFamily: sansFamily,
+    fontWeight: "800",
     lineHeight: 16,
     letterSpacing: 13 * 0.02,
   },
@@ -214,7 +248,8 @@ export const labelTiny = makeTypeSpec(
 export const runningText = makeTypeSpec(
   {
     fontSize: 19,
-    fontFamily: "Raptor Premium Regular",
+    fontFamily: serifFamily,
+    fontWeight: "400",
     lineHeight: 24,
     letterSpacing: 0,
   },
@@ -226,7 +261,8 @@ export const runningText = makeTypeSpec(
 export const runningTextSmall = makeTypeSpec(
   {
     fontSize: 16,
-    fontFamily: "Raptor Premium Regular",
+    fontFamily: serifFamily,
+    fontWeight: "400",
     lineHeight: 20,
     letterSpacing: 0,
   },
