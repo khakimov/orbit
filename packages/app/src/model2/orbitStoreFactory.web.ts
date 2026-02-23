@@ -6,7 +6,3 @@ export async function createOrbitStore(
 ): Promise<OrbitStore> {
   return new OrbitStoreWeb({ databaseName });
 }
-
-export async function createDefaultOrbitStore(): Promise<OrbitStore> {
-  return createOrbitStore("shared.orbitStore");
-}

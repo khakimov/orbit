@@ -1,5 +1,8 @@
 import { Slot } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
+import { AuthenticationClientContext } from "../authentication/authContext.js";
+import SupabaseAuthenticationClient from "../authentication/supabaseAuthenticationClient.js";
+import { supabase } from "../authentication/supabaseClient.js";
 import { initializeReporter } from "../errorReporting";
 import { initIntentHandlers } from "../util/intents/IntentHandler.js";
 import usePageViewTracking from "../util/usePageViewTracking";
@@ -12,5 +15,13 @@ export default function RootLayout() {
     initializeReporter();
   }, []);
 
-  return <Slot />;
+  const [authenticationClient] = useState(
+    () => new SupabaseAuthenticationClient(supabase),
+  );
+
+  return (
+    <AuthenticationClientContext.Provider value={authenticationClient}>
+      <Slot />
+    </AuthenticationClientContext.Provider>
+  );
 }

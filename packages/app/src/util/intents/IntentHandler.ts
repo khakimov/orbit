@@ -1,6 +1,6 @@
 import { NativeEventEmitter, NativeModules } from "react-native";
 import {
-  handleIngestEventWithDefaultStore,
+  handleIngestEventWithUserStore,
   IngestEventEmitterType,
 } from "./handleIngestEvent.js";
 
@@ -13,6 +13,6 @@ const eventEmitter = new NativeEventEmitter(IngestEventEmitter);
 export function initIntentHandlers() {
   eventEmitter.addListener(
     "onIngestEvent",
-    handleIngestEventWithDefaultStore(IngestEventEmitter),
+    handleIngestEventWithUserStore(IngestEventEmitter),
   );
 }

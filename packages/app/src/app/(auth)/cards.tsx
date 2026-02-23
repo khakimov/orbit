@@ -121,7 +121,7 @@ export default function CardsPage() {
             )}
           </View>
           <View style={{ flexDirection: "row", gap: gridUnit }}>
-            <NavButton label="Add" onPress={() => router.push("/seed")} primary />
+            <NavButton label="Add" onPress={() => router.push("/cards/add")} primary />
             <NavButton label="Review" onPress={() => router.replace("/")} />
           </View>
         </View>

@@ -1,4 +1,4 @@
-import { Event } from "@withorbit/core";
+import { AttachmentID, AttachmentMIMEType, Event } from "@withorbit/core";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 interface EventRow {
@@ -46,32 +46,99 @@ export class SupabaseSyncAdapter {
 
   // Pull events from Supabase newer than lastSyncAt.
   // Returns the events and the created_at of the latest one (for cursor).
+  // Paginates in batches of PAGE_SIZE to avoid Supabase's default 1000-row cap.
   async pullEvents(
     lastSyncAt: string | null,
   ): Promise<{ events: Event[]; latestCreatedAt: string | null }> {
-    const query = this._supabase
-      .from("events")
-      .select("data, created_at")
-      .order("created_at", { ascending: true });
+    const PAGE_SIZE = 1000;
+    const allEvents: Event[] = [];
+    let cursor = lastSyncAt;
 
-    if (lastSyncAt) {
-      query.gt("created_at", lastSyncAt);
+    for (;;) {
+      const query = this._supabase
+        .from("events")
+        .select("data, created_at")
+        .order("created_at", { ascending: true })
+        .limit(PAGE_SIZE);
+
+      if (cursor) {
+        query.gt("created_at", cursor);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("[Sync] Pull failed:", error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) break;
+
+      allEvents.push(...data.map((row) => row.data as Event));
+      cursor = data[data.length - 1].created_at as string;
+
+      if (data.length < PAGE_SIZE) break;
     }
 
-    const { data, error } = await query;
+    return {
+      events: allEvents,
+      latestCreatedAt: cursor !== lastSyncAt ? cursor : null,
+    };
+  }
+
+  // Upload attachment bytes to Supabase Storage.
+  // Skips if the file already exists (upsert: false).
+  async pushAttachment(
+    id: AttachmentID,
+    contents: Uint8Array,
+    mimeType: AttachmentMIMEType,
+  ): Promise<void> {
+    const path = `${this._userId}/${id}`;
+    const { error } = await this._supabase.storage
+      .from("attachments")
+      .upload(path, contents, { contentType: mimeType, upsert: false });
+
+    // "Duplicate" / 409 means it already exists — that's fine.
+    // Also handle 400 (Duplicate) which Supabase may return.
+    const statusCode = (error as any)?.statusCode;
+    const isDuplicate = statusCode === 409 || statusCode === 400 || 
+                        error?.message?.toLowerCase().includes("duplicate");
+    if (error && !isDuplicate) {
+      console.error("[Sync] Attachment push failed:", error);
+      throw error;
+    }
+  }
+
+  // Download attachment bytes from Supabase Storage.
+  // Returns null if not found.
+  async pullAttachment(
+    id: AttachmentID,
+  ): Promise<{ contents: Uint8Array; mimeType: AttachmentMIMEType } | null> {
+    const path = `${this._userId}/${id}`;
+    const { data, error } = await this._supabase.storage
+      .from("attachments")
+      .download(path);
 
     if (error) {
-      console.error("[Sync] Pull failed:", error);
+      // 404 / "not found" is expected when attachment hasn't been uploaded.
+      if ((error as any).statusCode === 404 || error.message?.includes("not found")) {
+        return null;
+      }
+      console.error("[Sync] Attachment pull failed:", error);
       throw error;
     }
 
-    if (!data || data.length === 0) {
-      return { events: [], latestCreatedAt: null };
-    }
+    if (!data) return null;
 
-    const events = data.map((row) => row.data as Event);
-    const latestCreatedAt = data[data.length - 1].created_at as string;
+    const contents = new Uint8Array(await data.arrayBuffer());
+    const rawType = data.type || "image/png";
+    
+    // Use the raw MIME type if it's a valid image/* type, otherwise fall back to PNG.
+    // This preserves types like image/webp that aren't in the enum but are valid.
+    const mimeType = rawType.startsWith("image/")
+      ? (rawType as AttachmentMIMEType)
+      : AttachmentMIMEType.PNG;
 
-    return { events, latestCreatedAt };
+    return { contents, mimeType };
   }
 }

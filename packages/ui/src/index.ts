@@ -8,6 +8,8 @@ export type { ButtonProps } from "./components/Button.jsx";
 export { default as Card } from "./components/Card.jsx";
 export type { CardProps } from "./components/Card.jsx";
 
+export { default as PromptFieldRenderer } from "./components/PromptFieldRenderer.js";
+
 export { default as ContinueWithUser } from "./components/ContinueWithUser.jsx";
 
 export { default as FadeView } from "./components/FadeView.jsx";

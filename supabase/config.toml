@@ -1,0 +1,8 @@
+project_id = "iqmoaqphafuvotwmtycb"
+
+[api]
+enabled = true
+port = 54321
+
+[functions.review-card]
+verify_jwt = false

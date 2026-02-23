@@ -17,14 +17,17 @@ export function NavButton({
   label,
   onPress,
   primary,
+  disabled,
 }: {
   label: string;
   onPress: () => void;
   primary?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       style={{
         backgroundColor: primary ? neutral.accent : neutral.card,
         borderWidth: primary ? 0 : 1,
@@ -32,6 +35,7 @@ export function NavButton({
         paddingHorizontal: gridUnit * 2,
         paddingVertical: gridUnit,
         borderRadius,
+        opacity: disabled ? 0.5 : 1,
       }}
     >
       <Text
