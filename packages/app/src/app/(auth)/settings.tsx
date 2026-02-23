@@ -1,44 +1,198 @@
 import { Link, Spacer, styles } from "@withorbit/ui";
-import React from "react";
-import { Text, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
+import {
+  useAuthenticationClient,
+  useCurrentUserRecord,
+} from "../../authentication/authContext.js";
+import { supabase } from "../../authentication/supabaseClient.js";
 
-const Unsubscribe = () => (
-  <>
-    You&rsquo;ve been unsubscribed from review session notifications.
-    Orbit&rsquo;s still under heavy construction, so there&rsquo;s no interface
-    to resubscribe right now.{" "}
-    <Link href="mailto:contact@withorbit.com">Email us</Link> (or reply to any
-    past email) if you&rsquo;d like to resubscribe.
-  </>
-);
-
-const Snooze = () => (
-  <>We won&rsquo;t send you any more review session notifications for a week.</>
-);
-
-const Problem = () => (
-  <>
-    Someting&rsquo;s gone wrong, and we weren&rsquo;t able to complete your
-    request. Please <Link href="mailto:contact@withorbit.com">email us</Link>{" "}
-    (or reply to any past email) to resolve this issue.
-  </>
-);
+interface TelegramStatus {
+  linked: boolean;
+  telegram_username: string | null;
+  telegram_linked_at: string | null;
+}
 
 const palette = styles.colors.palettes.lime;
-export default function SettingsPage() {
+
+function TelegramLinking({ userId }: { userId: string }) {
+  const [status, setStatus] = useState<TelegramStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke(
+        "link-telegram",
+        { method: "GET" },
+      );
+      if (fnError) throw fnError;
+      setStatus(data as TelegramStatus);
+    } catch (e) {
+      console.error("Failed to fetch Telegram status:", e);
+      setError("Could not load Telegram status.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
+
+  const handleLink = useCallback(async () => {
+    setActionLoading(true);
+    setError(null);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke(
+        "link-telegram",
+        { method: "POST" },
+      );
+      if (fnError) throw fnError;
+      const deepLink = (data as { deep_link: string }).deep_link;
+      await Linking.openURL(deepLink);
+      // Poll for completion after a short delay
+      setTimeout(() => fetchStatus(), 5000);
+    } catch (e) {
+      console.error("Failed to generate linking token:", e);
+      setError("Failed to start linking. Please try again.");
+    } finally {
+      setActionLoading(false);
+    }
+  }, [fetchStatus]);
+
+  const handleUnlink = useCallback(async () => {
+    setActionLoading(true);
+    setError(null);
+    try {
+      const { error: fnError } = await supabase.functions.invoke(
+        "link-telegram",
+        { method: "DELETE" },
+      );
+      if (fnError) throw fnError;
+      setStatus({ linked: false, telegram_username: null, telegram_linked_at: null });
+    } catch (e) {
+      console.error("Failed to unlink Telegram:", e);
+      setError("Failed to unlink. Please try again.");
+    } finally {
+      setActionLoading(false);
+    }
+  }, []);
+
+  if (loading) {
+    return <ActivityIndicator />;
+  }
+
+  return (
+    <View>
+      <Text style={[styles.type.label.layoutStyle, { marginBottom: 8 }]}>
+        Telegram
+      </Text>
+      {status?.linked ? (
+        <View>
+          <Text style={styles.type.runningText.layoutStyle}>
+            Linked to @{status.telegram_username ?? "unknown"}
+          </Text>
+          <Spacer units={2} />
+          <Pressable
+            onPress={handleUnlink}
+            disabled={actionLoading}
+            style={({ pressed }) => [
+              buttonStyle,
+              pressed && { opacity: 0.7 },
+              actionLoading && { opacity: 0.5 },
+            ]}
+          >
+            <Text style={buttonTextStyle}>
+              {actionLoading ? "Unlinking..." : "Unlink Telegram"}
+            </Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View>
+          <Text style={styles.type.runningText.layoutStyle}>
+            Link your Telegram account to review cards via the Orbit bot.
+          </Text>
+          <Spacer units={2} />
+          <Pressable
+            onPress={handleLink}
+            disabled={actionLoading}
+            style={({ pressed }) => [
+              buttonStyle,
+              pressed && { opacity: 0.7 },
+              actionLoading && { opacity: 0.5 },
+            ]}
+          >
+            <Text style={buttonTextStyle}>
+              {actionLoading ? "Opening Telegram..." : "Link Telegram"}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+      {error && (
+        <>
+          <Spacer units={2} />
+          <Text style={[styles.type.runningText.layoutStyle, { color: "#c00" }]}>
+            {error}
+          </Text>
+        </>
+      )}
+    </View>
+  );
+}
+
+// Legacy action handler (email unsubscribe/snooze)
+function LegacyAction() {
   const { message, headline } = React.useMemo(() => {
     const url = new URL(location.href);
     const params = url.searchParams;
     const action = params.get("completedAction");
     switch (action) {
       case "unsubscribe":
-        return { message: <Unsubscribe />, headline: "Got it." };
+        return {
+          message: (
+            <>
+              You&rsquo;ve been unsubscribed from review session notifications.{" "}
+              <Link href="mailto:contact@withorbit.com">Email us</Link> to
+              resubscribe.
+            </>
+          ),
+          headline: "Got it.",
+        };
       case "snooze1Week":
-        return { message: <Snooze />, headline: "Got it." };
+        return {
+          message: <>We won&rsquo;t send notifications for a week.</>,
+          headline: "Got it.",
+        };
       default:
-        return { message: <Problem />, headline: "Hm..." };
+        return null as never;
     }
   }, []);
+
+  return (
+    <>
+      <Text style={styles.type.headline.layoutStyle}>{headline}</Text>
+      <Spacer units={4} />
+      <Text style={styles.type.runningText.layoutStyle}>{message}</Text>
+    </>
+  );
+}
+
+export default function SettingsPage() {
+  const authenticationClient = useAuthenticationClient();
+  const userRecord = useCurrentUserRecord(authenticationClient);
+
+  // Check if this is a legacy action URL
+  const isLegacyAction =
+    typeof location !== "undefined" &&
+    new URL(location.href).searchParams.has("completedAction");
 
   return (
     <View
@@ -49,10 +203,42 @@ export default function SettingsPage() {
       }}
     >
       <View style={{ width: "100%", maxWidth: 500, margin: "auto" }}>
-        <Text style={styles.type.headline.layoutStyle}>{headline}</Text>
-        <Spacer units={4} />
-        <Text style={styles.type.runningText.layoutStyle}>{message}</Text>
+        {isLegacyAction ? (
+          <LegacyAction />
+        ) : (
+          <>
+            <Text style={styles.type.headline.layoutStyle}>Settings</Text>
+            <Spacer units={6} />
+            {userRecord ? (
+              <>
+                <Text style={styles.type.runningText.layoutStyle}>
+                  {userRecord.emailAddress}
+                </Text>
+                <Spacer units={6} />
+                <TelegramLinking userId={userRecord.userID} />
+              </>
+            ) : (
+              <Text style={styles.type.runningText.layoutStyle}>
+                Sign in to manage settings.
+              </Text>
+            )}
+          </>
+        )}
       </View>
     </View>
   );
 }
+
+const buttonStyle = {
+  backgroundColor: "#1a1a1a",
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  borderRadius: 6,
+  alignSelf: "flex-start" as const,
+};
+
+const buttonTextStyle = {
+  color: "#fff",
+  fontSize: 14,
+  fontWeight: "600" as const,
+};
