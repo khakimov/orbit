@@ -13,8 +13,9 @@ import {
 import { PromptFieldRenderer, styles } from "@withorbit/ui";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   Image,
   Platform,
   Pressable,
@@ -89,8 +90,19 @@ export default function AddCardPage() {
   const [answer, setAnswer] = useState("");
   const [image, setImage] = useState<PickedImage | null>(null);
   const [context, setContext] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+
+  function showToast(message: string, duration = 2000) {
+    setToast(message);
+    toastOpacity.setValue(0);
+    Animated.sequence([
+      Animated.timing(toastOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+      Animated.delay(duration),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start(() => setToast(null));
+  }
   const [reviewing, setReviewing] = useState(false);
   const [review, setReview] = useState<CardReview | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
@@ -123,11 +135,10 @@ export default function AddCardPage() {
     const asset = result.assets[0];
     const mime = mimeTypeFromPicker(asset.mimeType);
     if (!mime) {
-      setStatus("Unsupported image type. Use PNG, JPEG, or SVG.");
+      showToast("Unsupported image type. Use PNG, JPEG, or SVG.", 3000);
       return;
     }
     setImage({ uri: asset.uri, mimeType: mime });
-    setStatus(null);
   }
 
   const canReview = useMemo(
@@ -167,12 +178,11 @@ export default function AddCardPage() {
   async function handleSave() {
     if (!databaseManager) return;
     if (!question.trim() || !answer.trim()) {
-      setStatus("Both question and answer are required.");
+      showToast("Both question and answer are required.", 3000);
       return;
     }
 
     setSaving(true);
-    setStatus(null);
 
     try {
       const events: (TaskIngestEvent | AttachmentIngestEvent)[] = [];
@@ -217,11 +227,10 @@ export default function AddCardPage() {
       if (!contextPinned) setContext("");
       setReview(null);
       setReviewError(null);
-      setStatus("Saved!");
-      setTimeout(() => setStatus(null), 2000);
+      showToast("Saved!");
     } catch (error) {
       console.error("Failed to save card:", error);
-      setStatus("Save failed. Check console.");
+      showToast("Save failed. Check console.", 3000);
     } finally {
       setSaving(false);
     }
@@ -442,23 +451,13 @@ export default function AddCardPage() {
                 label={saving ? "Saving..." : "Save Card"}
                 onPress={handleSave}
                 primary
-                disabled={!databaseManager || saving}
+                disabled={!databaseManager || saving || reviewing}
               />
               <NavButton
                 label={reviewing ? "Reviewing..." : "Review with AI"}
                 onPress={handleReview}
                 disabled={!canReview || reviewing}
               />
-              {status && (
-                <Text
-                  style={[
-                    styles.type.runningTextSmall.typeStyle,
-                    { color: neutral.textSoft },
-                  ]}
-                >
-                  {status}
-                </Text>
-              )}
             </View>
           </View>
 
@@ -669,6 +668,26 @@ export default function AddCardPage() {
           </View>
         </ScrollView>
       </View>
+
+      {/* Toast */}
+      {toast && (
+        <Animated.View
+          style={{
+            position: "absolute",
+            bottom: gridUnit * 4,
+            alignSelf: "center",
+            opacity: toastOpacity,
+            backgroundColor: neutral.text,
+            paddingHorizontal: gridUnit * 2,
+            paddingVertical: gridUnit,
+            borderRadius,
+          }}
+        >
+          <Text style={[styles.type.labelSmall.typeStyle, { color: "#fff" }]}>
+            {toast}
+          </Text>
+        </Animated.View>
+      )}
     </View>
   );
 }

@@ -113,12 +113,11 @@ Deno.serve(async (req) => {
         "cf-aig-authorization": `Bearer ${cfAigToken}`,
       },
       body: JSON.stringify({
-        model: "gpt-5-mini-2025-08-07",
+        model: "gpt-5-mini",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },
         ],
-        temperature: 0.3,
         response_format: { type: "json_object" },
       }),
     });
