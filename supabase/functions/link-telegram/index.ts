@@ -1,7 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const BOT_USERNAME = Deno.env.get("TELEGRAM_BOT_USERNAME") ?? "OrbitReviewBot";
+const BOT_USERNAME = Deno.env.get("TELEGRAM_BOT_USERNAME");
+if (!BOT_USERNAME) {
+  console.error("TELEGRAM_BOT_USERNAME env var is not set");
+}
 
 function corsHeaders(): Record<string, string> {
   return {
@@ -79,6 +82,20 @@ Deno.serve(async (req) => {
 
     // POST -- generate a linking token and return a deep link
     if (method === "POST") {
+      // Rate limit: one token per 60 seconds
+      const { data: existing } = await serviceClient
+        .from("user_profiles")
+        .select("updated_at")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (existing?.updated_at) {
+        const elapsed = Date.now() - new Date(existing.updated_at).getTime();
+        if (elapsed < 60_000) {
+          return jsonResponse({ error: "Please wait before generating a new link" }, 429);
+        }
+      }
+
       const token = generateToken();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min
 
@@ -99,6 +116,9 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Failed to generate token" }, 500);
       }
 
+      if (!BOT_USERNAME) {
+        return jsonResponse({ error: "Bot not configured" }, 500);
+      }
       const deepLink = `https://t.me/${BOT_USERNAME}?start=${token}`;
       return jsonResponse({ deep_link: deepLink, expires_at: expiresAt });
     }
