@@ -18,6 +18,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Animated,
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -86,6 +87,208 @@ async function fetchImageBytes(uri: string): Promise<Uint8Array> {
   return new Uint8Array(buffer);
 }
 
+// Mobile: Collapsible inline context with full-screen modal editing
+function MobileContextSection({
+  context,
+  setContext,
+  expanded,
+  setExpanded,
+  modalVisible,
+  setModalVisible,
+  contextPreview,
+}: {
+  context: string;
+  setContext: (s: string) => void;
+  expanded: boolean;
+  setExpanded: (v: boolean) => void;
+  modalVisible: boolean;
+  setModalVisible: (v: boolean) => void;
+  contextPreview: string | null;
+}) {
+  const animatedHeight = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    Animated.timing(animatedHeight, {
+      toValue: expanded ? 200 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [expanded, animatedHeight]);
+
+  const hasContent = context.length > 0;
+
+  return (
+    <>
+      {/* Inline collapsible preview */}
+      <View
+        style={{
+          marginTop: gridUnit * 2,
+          borderWidth: 1,
+          borderColor: neutral.border,
+          borderRadius,
+          backgroundColor: neutral.card,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header - tap to expand/collapse, long press for modal */}
+        <Pressable
+          onPress={() => setExpanded(!expanded)}
+          onLongPress={() => setModalVisible(true)}
+          delayLongPress={400}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            padding: gridUnit,
+            paddingHorizontal: gridUnit * 1.5,
+          }}
+        >
+          <Text style={[styles.type.labelSmall.typeStyle, { color: neutral.textSoft, flex: 1 }]}>
+            {"📄 Context "}
+            {hasContent && (
+              <Text style={{ fontSize: 10, color: neutral.textSoft }}>
+                {`~${Math.ceil(context.length / 4)} tokens`}
+              </Text>
+            )}
+          </Text>
+          <Text style={{ color: neutral.textSoft, fontSize: 12 }}>
+            {expanded ? '▼' : hasContent ? '▶' : '+'}
+          </Text>
+        </Pressable>
+
+        {/* Expanded inline input (200px height) */}
+        <Animated.View style={{ height: animatedHeight, overflow: 'hidden' }}>
+          <View style={{ flex: 1, padding: gridUnit, paddingTop: 0 }}>
+            <ScrollView style={{ flex: 1 }}>
+              <TextInput
+                value={context}
+                onChangeText={setContext}
+                multiline
+                placeholder="Paste reference material, notes, or source text here..."
+                placeholderTextColor={neutral.textSoft}
+                style={{
+                  fontSize: 14,
+                  lineHeight: 20,
+                  color: neutral.text,
+                  minHeight: 180,
+                }}
+              />
+            </ScrollView>
+            {/* Expand button for full modal */}
+            <Pressable
+              onPress={() => setModalVisible(true)}
+              style={{
+                position: 'absolute',
+                bottom: gridUnit,
+                right: gridUnit,
+                backgroundColor: neutral.bg,
+                paddingHorizontal: gridUnit,
+                paddingVertical: gridUnit / 2,
+                borderRadius: borderRadius / 2,
+                borderWidth: 1,
+                borderColor: neutral.border,
+              }}
+            >
+              <Text style={{ fontSize: 11, color: neutral.textSoft }}>Expand</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
+
+        {/* Collapsed preview (2 lines max) */}
+        {!expanded && hasContent && (
+          <View style={{ padding: gridUnit, paddingTop: 0 }}>
+            <Text
+              numberOfLines={2}
+              style={[styles.type.runningTextSmall.typeStyle, { color: neutral.text }]}
+            >
+              {contextPreview}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Full-screen modal for deep editing */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: neutral.bg }}>
+          {/* Modal Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: gridUnit * 2,
+              paddingTop: gridUnit * 3,
+              paddingBottom: gridUnit * 2,
+              borderBottomWidth: 1,
+              borderBottomColor: neutral.border,
+              backgroundColor: neutral.card,
+            }}
+          >
+            <Text style={[styles.type.headline.layoutStyle, { color: neutral.text }]}>
+              Context
+            </Text>
+            <Pressable
+              onPress={() => setModalVisible(false)}
+              style={{
+                paddingHorizontal: gridUnit * 1.5,
+                paddingVertical: gridUnit / 2,
+                backgroundColor: neutral.accent,
+                borderRadius,
+              }}
+            >
+              <Text style={[styles.type.labelSmall.typeStyle, { color: '#fff' }]}>
+                Done
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Modal Content */}
+          <ScrollView style={{ flex: 1 }}>
+            <TextInput
+              value={context}
+              onChangeText={setContext}
+              multiline
+              autoFocus
+              placeholder="Paste reference material, notes, or source text here..."
+              placeholderTextColor={neutral.textSoft}
+              style={{
+                fontSize: 16,
+                lineHeight: 24,
+                color: neutral.text,
+                padding: gridUnit * 2,
+                minHeight: 400,
+              }}
+            />
+          </ScrollView>
+
+          {/* Footer with token count */}
+          <View
+            style={{
+              padding: gridUnit * 2,
+              borderTopWidth: 1,
+              borderTopColor: neutral.border,
+              backgroundColor: neutral.card,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Text style={[styles.type.labelSmall.typeStyle, { color: neutral.textSoft }]}>
+              {context.length} characters
+            </Text>
+            <Text style={[styles.type.labelSmall.typeStyle, { color: neutral.textSoft }]}>
+              ~{Math.ceil(context.length / 4)} tokens
+            </Text>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
 export default function AddCardPage() {
   const params = useLocalSearchParams<{
     editId?: string;
@@ -115,6 +318,10 @@ export default function AddCardPage() {
   const [review, setReview] = useState<CardReview | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [contextPinned, setContextPinned] = useState(false);
+  
+  // Mobile context UI state
+  const [contextExpanded, setContextExpanded] = useState(false);
+  const [contextModalVisible, setContextModalVisible] = useState(false);
 
   // Load pinned context from localStorage on mount
   useEffect(() => {
@@ -294,6 +501,13 @@ export default function AddCardPage() {
   );
 
   const isWeb = Platform.OS === "web";
+  
+  // Get preview text (first 2 lines max 100 chars)
+  const contextPreview = useMemo(() => {
+    if (!context) return null;
+    const firstLine = context.split('\n')[0];
+    return firstLine.length > 100 ? firstLine.slice(0, 100) + '...' : firstLine;
+  }, [context]);
 
   return (
     <View style={{ backgroundColor: neutral.bg, flex: 1 }}>
@@ -501,36 +715,34 @@ export default function AddCardPage() {
             </View>
           </View>
 
-          {/* Right column: context sidebar */}
-          <View
-            style={{
-              flex: 1,
-              marginLeft: isWeb ? gridUnit * 3 : 0,
-              marginTop: isWeb ? 0 : gridUnit * 3,
-              ...(isWeb && {
+          {/* Context + AI Review: Web sidebar / Mobile collapsible */}
+          {isWeb ? (
+            /* Web: Sticky sidebar */
+            <View
+              style={{
+                flex: 1,
+                marginLeft: gridUnit * 3,
                 position: "sticky" as any,
                 top: gridUnit * 2,
                 alignSelf: "flex-start",
                 maxHeight: "calc(100vh - 8rem)" as any,
                 overflow: "auto" as any,
-              }),
-              borderWidth: 1,
-              borderColor: neutral.border,
-              borderRadius,
-              padding: gridUnit * 2,
-              backgroundColor: neutral.card,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: gridUnit / 2 }}>
-              <Text
-                style={[
-                  styles.type.labelSmall.typeStyle,
-                  { color: neutral.textSoft, flex: 1 },
-                ]}
-              >
-                {"Context  "}{context.length > 0 && (<Text style={{ fontSize: 10, color: neutral.textSoft }}>{`~${Math.ceil(context.length / 4)} tokens`}</Text>)}
-              </Text>
-              {Platform.OS === "web" && (
+                borderWidth: 1,
+                borderColor: neutral.border,
+                borderRadius,
+                padding: gridUnit * 2,
+                backgroundColor: neutral.card,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: gridUnit / 2 }}>
+                <Text
+                  style={[
+                    styles.type.labelSmall.typeStyle,
+                    { color: neutral.textSoft, flex: 1 },
+                  ]}
+                >
+                  {"Context  "}{context.length > 0 && (<Text style={{ fontSize: 10, color: neutral.textSoft }}>{`~${Math.ceil(context.length / 4)} tokens`}</Text>)}
+                </Text>
                 <Pressable
                   onPress={() => {
                     if (contextPinned) {
@@ -552,47 +764,193 @@ export default function AddCardPage() {
                     {"\u25C9"}
                   </Text>
                 </Pressable>
+              </View>
+              <TextInput
+                value={context}
+                onChangeText={(text) => {
+                  setContext(text);
+                  if (contextPinned) {
+                    localStorage.setItem("orbit:pinned-context", text);
+                  }
+                }}
+                multiline
+                placeholder="Scratchpad for notes, source material, context..."
+                placeholderTextColor={neutral.textSoft}
+                style={{
+                  fontSize: 14,
+                  lineHeight: 20,
+                  padding: gridUnit,
+                  color: neutral.text,
+                  minHeight: review ? 120 : 300,
+                }}
+              />
+
+              {/* AI Review results */}
+              {reviewError && (
+                <View style={{ marginTop: gridUnit * 2 }}>
+                  <Text style={[styles.type.runningTextSmall.typeStyle, { color: "#dc2626" }]}>
+                    {reviewError}
+                  </Text>
+                </View>
+              )}
+              {review && (
+                <View style={{ marginTop: gridUnit * 2 }}>
+                  <View
+                    style={{
+                      borderTopWidth: 1,
+                      borderTopColor: neutral.border,
+                      paddingTop: gridUnit * 2,
+                    }}
+                  >
+                    {/* Verdict badge */}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: gridUnit }}>
+                      <View
+                        style={{
+                          backgroundColor: verdictColors[review.verdict],
+                          paddingHorizontal: gridUnit,
+                          paddingVertical: gridUnit / 2,
+                          borderRadius: borderRadius / 2,
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.type.labelSmall.typeStyle,
+                            { color: "#fff" },
+                          ]}
+                        >
+                          {verdictLabels[review.verdict]}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.type.runningTextSmall.typeStyle,
+                          { color: neutral.text, flex: 1 },
+                        ]}
+                      >
+                        {review.summary}
+                      </Text>
+                    </View>
+
+                    {/* Issues */}
+                    {review.issues.length > 0 && (
+                      <View style={{ marginTop: gridUnit * 2 }}>
+                        {review.issues.map((issue, i) => (
+                          <View
+                            key={i}
+                            style={{
+                              marginBottom: gridUnit,
+                              padding: gridUnit,
+                              backgroundColor: neutral.bg,
+                              borderRadius: borderRadius / 2,
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.type.labelSmall.typeStyle,
+                                { color: neutral.textSoft, marginBottom: 2 },
+                              ]}
+                            >
+                              {issue.category}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.type.runningTextSmall.typeStyle,
+                                { color: neutral.text },
+                              ]}
+                            >
+                              {issue.description}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.type.runningTextSmall.typeStyle,
+                                { color: neutral.textSoft, fontStyle: "italic", marginTop: 2 },
+                              ]}
+                            >
+                              {issue.suggestion}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Rewrite suggestions */}
+                    {review.rewrite && (review.rewrite.question || review.rewrite.answer) && (
+                      <View style={{ marginTop: gridUnit }}>
+                        <Text
+                          style={[
+                            styles.type.labelSmall.typeStyle,
+                            { color: neutral.textSoft, marginBottom: gridUnit / 2 },
+                          ]}
+                        >
+                          Suggested rewrite
+                        </Text>
+                        {review.rewrite.question && (
+                          <Text
+                            style={[
+                              styles.type.runningTextSmall.typeStyle,
+                              { color: neutral.text, marginBottom: 2 },
+                            ]}
+                          >
+                            Q: {review.rewrite.question}
+                          </Text>
+                        )}
+                        {review.rewrite.answer && (
+                          <Text
+                            style={[
+                              styles.type.runningTextSmall.typeStyle,
+                              { color: neutral.text, marginBottom: gridUnit },
+                            ]}
+                          >
+                            A: {review.rewrite.answer}
+                          </Text>
+                        )}
+                        <NavButton
+                          label="Apply rewrite"
+                          onPress={() => {
+                            if (review.rewrite?.question) setQuestion(review.rewrite.question);
+                            if (review.rewrite?.answer) setAnswer(review.rewrite.answer);
+                          }}
+                        />
+                      </View>
+                    )}
+                  </View>
+                </View>
               )}
             </View>
-            <TextInput
-              value={context}
-              onChangeText={(text) => {
-                setContext(text);
-                if (contextPinned && Platform.OS === "web") {
-                  localStorage.setItem("orbit:pinned-context", text);
-                }
-              }}
-              multiline
-              placeholder="Scratchpad for notes, source material, context..."
-              placeholderTextColor={neutral.textSoft}
-              style={{
-                fontSize: 14,
-                lineHeight: 20,
-                padding: gridUnit,
-                color: neutral.text,
-                minHeight: isWeb ? (review ? 120 : 300) : 120,
-              }}
+          ) : (
+            /* Mobile: Collapsible inline context */
+            <MobileContextSection
+              context={context}
+              setContext={setContext}
+              expanded={contextExpanded}
+              setExpanded={setContextExpanded}
+              modalVisible={contextModalVisible}
+              setModalVisible={setContextModalVisible}
+              contextPreview={contextPreview}
             />
+          )}
 
-            {/* AI Review results */}
-            {reviewError && (
-              <View style={{ marginTop: gridUnit * 2 }}>
+          {/* Mobile: AI Review results below context */}
+          {!isWeb && (reviewError || review) && (
+            <View
+              style={{
+                marginTop: gridUnit * 2,
+                borderWidth: 1,
+                borderColor: neutral.border,
+                borderRadius,
+                padding: gridUnit * 2,
+                backgroundColor: neutral.card,
+              }}
+            >
+              {reviewError && (
                 <Text style={[styles.type.runningTextSmall.typeStyle, { color: "#dc2626" }]}>
                   {reviewError}
                 </Text>
-              </View>
-            )}
-            {review && (
-              <View style={{ marginTop: gridUnit * 2 }}>
-                <View
-                  style={{
-                    borderTopWidth: 1,
-                    borderTopColor: neutral.border,
-                    paddingTop: gridUnit * 2,
-                  }}
-                >
+              )}
+              {review && (
+                <>
                   {/* Verdict badge */}
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: gridUnit }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: gridUnit, marginBottom: gridUnit * 2 }}>
                     <View
                       style={{
                         backgroundColor: verdictColors[review.verdict],
@@ -601,28 +959,18 @@ export default function AddCardPage() {
                         borderRadius: borderRadius / 2,
                       }}
                     >
-                      <Text
-                        style={[
-                          styles.type.labelSmall.typeStyle,
-                          { color: "#fff" },
-                        ]}
-                      >
+                      <Text style={[styles.type.labelSmall.typeStyle, { color: "#fff" }]}>
                         {verdictLabels[review.verdict]}
                       </Text>
                     </View>
-                    <Text
-                      style={[
-                        styles.type.runningTextSmall.typeStyle,
-                        { color: neutral.text, flex: 1 },
-                      ]}
-                    >
+                    <Text style={[styles.type.runningTextSmall.typeStyle, { color: neutral.text, flex: 1 }]}>
                       {review.summary}
                     </Text>
                   </View>
 
                   {/* Issues */}
                   {review.issues.length > 0 && (
-                    <View style={{ marginTop: gridUnit * 2 }}>
+                    <View style={{ marginBottom: gridUnit * 2 }}>
                       {review.issues.map((issue, i) => (
                         <View
                           key={i}
@@ -633,28 +981,13 @@ export default function AddCardPage() {
                             borderRadius: borderRadius / 2,
                           }}
                         >
-                          <Text
-                            style={[
-                              styles.type.labelSmall.typeStyle,
-                              { color: neutral.textSoft, marginBottom: 2 },
-                            ]}
-                          >
+                          <Text style={[styles.type.labelSmall.typeStyle, { color: neutral.textSoft, marginBottom: 2 }]}>
                             {issue.category}
                           </Text>
-                          <Text
-                            style={[
-                              styles.type.runningTextSmall.typeStyle,
-                              { color: neutral.text },
-                            ]}
-                          >
+                          <Text style={[styles.type.runningTextSmall.typeStyle, { color: neutral.text }]}>
                             {issue.description}
                           </Text>
-                          <Text
-                            style={[
-                              styles.type.runningTextSmall.typeStyle,
-                              { color: neutral.textSoft, fontStyle: "italic", marginTop: 2 },
-                            ]}
-                          >
+                          <Text style={[styles.type.runningTextSmall.typeStyle, { color: neutral.textSoft, fontStyle: "italic", marginTop: 2 }]}>
                             {issue.suggestion}
                           </Text>
                         </View>
@@ -664,32 +997,17 @@ export default function AddCardPage() {
 
                   {/* Rewrite suggestions */}
                   {review.rewrite && (review.rewrite.question || review.rewrite.answer) && (
-                    <View style={{ marginTop: gridUnit }}>
-                      <Text
-                        style={[
-                          styles.type.labelSmall.typeStyle,
-                          { color: neutral.textSoft, marginBottom: gridUnit / 2 },
-                        ]}
-                      >
+                    <>
+                      <Text style={[styles.type.labelSmall.typeStyle, { color: neutral.textSoft, marginBottom: gridUnit / 2 }]}>
                         Suggested rewrite
                       </Text>
                       {review.rewrite.question && (
-                        <Text
-                          style={[
-                            styles.type.runningTextSmall.typeStyle,
-                            { color: neutral.text, marginBottom: 2 },
-                          ]}
-                        >
+                        <Text style={[styles.type.runningTextSmall.typeStyle, { color: neutral.text, marginBottom: 2 }]}>
                           Q: {review.rewrite.question}
                         </Text>
                       )}
                       {review.rewrite.answer && (
-                        <Text
-                          style={[
-                            styles.type.runningTextSmall.typeStyle,
-                            { color: neutral.text, marginBottom: gridUnit },
-                          ]}
-                        >
+                        <Text style={[styles.type.runningTextSmall.typeStyle, { color: neutral.text, marginBottom: gridUnit }]}>
                           A: {review.rewrite.answer}
                         </Text>
                       )}
@@ -700,12 +1018,12 @@ export default function AddCardPage() {
                           if (review.rewrite?.answer) setAnswer(review.rewrite.answer);
                         }}
                       />
-                    </View>
+                    </>
                   )}
-                </View>
-              </View>
-            )}
-          </View>
+                </>
+              )}
+            </View>
+          )}
         </ScrollView>
       </View>
 
