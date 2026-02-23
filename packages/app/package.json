@@ -60,7 +60,7 @@
     "@withorbit/sample-data": "0.0.1",
     "expo-dev-client": "~4.0.19",
     "source-map-explorer": "^2.5.3",
-    "typescript": "~5.3.3"
+    "typescript": "~5.9.3"
   },
   "private": true
 }

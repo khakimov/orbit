@@ -105,7 +105,7 @@ async function readAttachmentAtPath(
   const mimeType = getAttachmentMIMETypeForFilename(name);
   if (mimeType) {
     const contents = await fs.promises.readFile(path);
-    return { mimeType, contents, id: convertAnkiID(name) };
+    return { mimeType, contents: new Uint8Array(contents), id: convertAnkiID(name) };
   } else {
     return new Error(`Unsupported attachment type: ${name}`);
   }

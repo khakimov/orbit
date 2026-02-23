@@ -16,7 +16,7 @@
     "@withorbit/sample-data": "0.0.1",
     "babel-jest": "^29.7.0",
     "jest": "^29.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@withorbit/api": "0.0.1",

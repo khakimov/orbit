@@ -1,5 +1,4 @@
-import MarkdownIt from "markdown-it/lib";
-import Token from "markdown-it/lib/token.js";
+import MarkdownIt from "markdown-it";
 
 // When a cloze is revealed, we hackily designate that to the Markdown renderer by surrounding it with sentinels. This plugin finds those sentinels and replaces them with proper tokens which will be rendered with the appropriate styling.
 
@@ -10,6 +9,7 @@ const clozeEndRegexp = new RegExp(clozeEndHighlightSentinel);
 
 export function clozeHighlightPlugin(md: MarkdownIt) {
   md.inline.ruler2.push("highlightCloze", (state) => {
+    const Token = state.Token;
     if (state.env.multiBlockClozeHighlightActive) {
       state.tokens.splice(
         0,
@@ -20,7 +20,7 @@ export function clozeHighlightPlugin(md: MarkdownIt) {
 
     function spliceTokensAtSentinel(
       sentinelRegex: RegExp,
-      tokenFactory: () => Token,
+      tokenFactory: () => InstanceType<typeof Token>,
     ) {
       let sentinelCount = 0;
       for (let i = 0; i < state.tokens.length; i++) {

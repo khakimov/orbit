@@ -37,7 +37,7 @@ test("round-trips attachments", async () => {
   await client.putAttachment2(
     testID,
     AttachmentMIMEType.PNG,
-    Buffer.from(testAttachmentBase64Data, "base64"),
+    new Uint8Array(Buffer.from(testAttachmentBase64Data, "base64")),
   );
   const { contents, mimeType } = await client.getAttachment2(testID);
   const savedBase64Data = Buffer.from(contents).toString("base64");

@@ -72,7 +72,7 @@ export class LocalFileStorageService implements FileStorageService {
     if (mimeType) {
       const filePath = this._getStorePath(subpath);
       const data = await fs.promises.readFile(filePath);
-      return { data, mimeType };
+      return { data: new Uint8Array(data), mimeType };
     } else {
       return null;
     }

@@ -41,7 +41,7 @@ describe("attachments", () => {
   test("after downloading URL resolves", async () => {
     const testBuffer = Buffer.from("Test");
     await store.attachmentStore.storeAttachment(
-      testBuffer,
+      new Uint8Array(testBuffer),
       testAttachmentReference.id,
       testAttachmentReference.mimeType,
     );

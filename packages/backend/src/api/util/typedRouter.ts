@@ -148,7 +148,7 @@ function extractMultipartFormData(request: express.Request): Promise<{
       busboy.on("field", (fieldname, val) => (fields[fieldname] = val));
 
       busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
-        const chunks: Buffer[] = [];
+        const chunks: BlobPart[] = [];
         const writable = new Writable({
           write(chunk, encoding, next) {
             chunks.push(chunk);
@@ -179,7 +179,7 @@ function extractMultipartFormData(request: express.Request): Promise<{
       // GCS munges multipart requests in a way which prevents direct piping into Busboy, but it adds a rawBody field containing the original body. https://cloud.google.com/functions/docs/writing/http#handling_multipart_form_uploads
       const { rawBody } = request as express.Request & { rawBody?: Buffer };
       if (rawBody) {
-        busboy.end(rawBody);
+        busboy.end(rawBody as Uint8Array);
       } else {
         request.pipe(busboy);
       }

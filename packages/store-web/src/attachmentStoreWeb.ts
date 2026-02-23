@@ -33,7 +33,7 @@ export class AttachmentStoreWeb implements AttachmentStore {
   async getURLForStoredAttachment(id: AttachmentID): Promise<string | null> {
     const row = await this._table.get(id);
     if (row) {
-      return encodeDataURL(row.data, row.type);
+      return encodeDataURL(row.data.buffer as ArrayBuffer, row.type);
     } else {
       return null;
     }

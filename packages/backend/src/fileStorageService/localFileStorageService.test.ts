@@ -22,7 +22,7 @@ describe("file storage", () => {
   const subpath = "foo/bar.txt";
   const contents = Buffer.from("Test");
   beforeEach(async () => {
-    await service.storeFile(subpath, contents, "plain/text");
+    await service.storeFile(subpath, new Uint8Array(contents), "plain/text");
   });
 
   test("round trips", async () => {

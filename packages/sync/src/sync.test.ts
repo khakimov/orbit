@@ -80,7 +80,7 @@ test("attachments synced", async () => {
     const events = createTestAttachmentIngestEvents(100);
     for (const { entityID, mimeType } of events) {
       await store.attachmentStore.storeAttachment(
-        Buffer.from("Test"),
+        new Uint8Array(Buffer.from("Test")),
         entityID,
         mimeType,
       );

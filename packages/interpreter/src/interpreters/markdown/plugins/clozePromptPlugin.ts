@@ -162,6 +162,10 @@ function resolveClozeNode(events: Micromark.Event[]) {
   for (const event of events) {
     if (event[0] === "enter" && event[1].type === types.chunkText) {
       const context = event[2];
+      // The `as any` casts below work around duplicate micromark-util-types:
+      // mdast-util-math bundles mdast-util-from-markdown@2.0.0 which has its
+      // own micromark-util-types@2.0.0, conflicting with the top-level 2.0.2.
+      // The types are structurally identical, so this is safe.
       event[2] = {
         ...context,
         parser: parse({
@@ -176,10 +180,10 @@ function resolveClozeNode(events: Micromark.Event[]) {
                   .flat()
                   .filter((c) => c !== clozeConstruct),
               },
-            },
+            } as any,
           ],
         }),
-      };
+      } as any;
     }
   }
   return events;
@@ -204,11 +208,13 @@ export default function clozePlugin(this: Processor) {
   if (!data.micromarkExtensions) {
     data.micromarkExtensions = [];
   }
-  data.micromarkExtensions.push(micromarkClozeExtension);
+  // Cast needed due to duplicate micromark-util-types (see comment in resolveClozeNode).
+  data.micromarkExtensions.push(micromarkClozeExtension as any);
 
   if (!data.fromMarkdownExtensions) {
     data.fromMarkdownExtensions = [];
   }
+  // Cast needed due to duplicate micromark-util-types (see comment in resolveClozeNode).
   data.fromMarkdownExtensions.push({
     enter: {
       [clozeToken]: enterClozeNode,
@@ -216,7 +222,7 @@ export default function clozePlugin(this: Processor) {
     exit: {
       [clozeToken]: exitClozeNode,
     },
-  });
+  } as any);
 }
 
 function enterClozeNode(

@@ -13,5 +13,5 @@ export function createBlobFromBuffer(
   buffer: Uint8Array,
   mimeType: string,
 ): Blob {
-  return new Blob([buffer], { type: mimeType });
+  return new Blob([buffer as BlobPart], { type: mimeType });
 }
