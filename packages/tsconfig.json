@@ -4,7 +4,6 @@
     { "path": "./api" },
     { "path": "./api-client" },
     { "path": "./app" },
-    { "path": "./backend" },
     { "path": "./core" },
     { "path": "./embedded-support" },
     { "path": "./ingester" },

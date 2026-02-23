@@ -45,9 +45,6 @@
       "path": "../ingester"
     },
     {
-      "path": "../sync"
-    },
-    {
       "path": "../ui"
     }
   ]
