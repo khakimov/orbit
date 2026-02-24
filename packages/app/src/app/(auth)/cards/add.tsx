@@ -24,6 +24,7 @@ import {
   ScrollView,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import {
@@ -500,7 +501,8 @@ export default function AddCardPage() {
     [image],
   );
 
-  const isWeb = Platform.OS === "web";
+  const { width } = useWindowDimensions();
+  const isWide = width >= 768;
   
   // Get preview text (first 2 lines max 100 chars)
   const contextPreview = useMemo(() => {
@@ -514,7 +516,7 @@ export default function AddCardPage() {
       <View
         style={{
           width: "100%",
-          maxWidth: isWeb ? 1100 : maximumContentWidth,
+          maxWidth: isWide ? 1100 : maximumContentWidth,
           alignSelf: "center",
           flex: 1,
         }}
@@ -546,12 +548,12 @@ export default function AddCardPage() {
           contentContainerStyle={{
             paddingHorizontal: edgeMargin,
             paddingBottom: gridUnit * 4,
-            ...(isWeb && { flexDirection: "row", alignItems: "flex-start" }),
+            ...(isWide && { flexDirection: "row", alignItems: "flex-start" }),
           }}
           keyboardShouldPersistTaps="handled"
         >
           {/* Left column: form */}
-          <View style={{ maxWidth: isWeb ? 550 : undefined, flex: isWeb ? undefined : 1, width: isWeb ? 550 : "100%" }}>
+          <View style={{ maxWidth: isWide ? 550 : undefined, flex: isWide ? undefined : 1, width: isWide ? 550 : "100%" }}>
             {/* Question */}
             <Text
               style={[
@@ -716,7 +718,7 @@ export default function AddCardPage() {
           </View>
 
           {/* Context + AI Review: Web sidebar / Mobile collapsible */}
-          {isWeb ? (
+          {isWide ? (
             /* Web: Sticky sidebar */
             <View
               style={{
@@ -931,7 +933,7 @@ export default function AddCardPage() {
           )}
 
           {/* Mobile: AI Review results below context */}
-          {!isWeb && (reviewError || review) && (
+          {!isWide && (reviewError || review) && (
             <View
               style={{
                 marginTop: gridUnit * 2,
