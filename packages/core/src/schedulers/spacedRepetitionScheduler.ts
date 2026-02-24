@@ -4,11 +4,13 @@ import { Scheduler, SchedulerOutput } from "../scheduler.js";
 
 export const defaultSpacedRepetitionSchedulerConfiguration = {
   intervalGrowthFactor: 2.3,
+  intervalShrinkFactor: 3.0, // asymmetric: forgetting penalises harder than remembering rewards
   initialReviewInterval: 1000 * 60 * 60 * 24 * 5, // five days
 };
 
 export interface SpacedRepetitionSchedulerConfiguration {
   intervalGrowthFactor: number;
+  intervalShrinkFactor: number;
   initialReviewInterval: number;
 }
 
@@ -66,7 +68,7 @@ export function createSpacedRepetitionScheduler(
             schedulerConfiguration.initialReviewInterval,
             Math.floor(
               componentState.intervalMillis /
-                schedulerConfiguration.intervalGrowthFactor,
+                schedulerConfiguration.intervalShrinkFactor,
             ),
           );
         }

@@ -25,7 +25,7 @@ export function createReviewQueue(
     );
   });
 
-  return reviewItems.slice(0, maximumQueueSize);
+  return spaceOutSameSourceCards(reviewItems.slice(0, maximumQueueSize));
 }
 
 /**
@@ -35,6 +35,37 @@ export function getReviewQueueFuzzyDueTimestampThreshold(
   nowMillis: number = Date.now(),
 ): number {
   return nowMillis + 1000 * 60 * 60 * 16; // 16 hour lookahead
+}
+
+/**
+ * Reorder the queue so cards from the same source (provenance.identifier) aren't
+ * reviewed back-to-back. Reduces semantic interference between related cards.
+ * O(n^2) but n <= 50 (queue limit), so negligible.
+ */
+function spaceOutSameSourceCards(items: ReviewItem[]): ReviewItem[] {
+  const result: ReviewItem[] = [];
+  const buffer = [...items];
+
+  while (buffer.length > 0) {
+    const prevIdentifier =
+      result.length > 0
+        ? result[result.length - 1].task.provenance?.identifier
+        : undefined;
+
+    // Find first card with a different source (or no source)
+    const nextIndex =
+      prevIdentifier != null
+        ? buffer.findIndex(
+            (item) => item.task.provenance?.identifier !== prevIdentifier,
+          )
+        : -1;
+
+    // If all remaining share the same source, just take the first
+    const index = nextIndex === -1 ? 0 : nextIndex;
+    result.push(buffer.splice(index, 1)[0]);
+  }
+
+  return result;
 }
 
 function extractReviewItemFromDueTask(dueTask: Task): ReviewItem {
