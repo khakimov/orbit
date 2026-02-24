@@ -211,6 +211,107 @@ test.each([
   );
 });
 
+describe("per-card ease factor", () => {
+  const stateWithEase: TaskComponentState = {
+    createdAtTimestampMillis: 0,
+    lastRepetitionTimestampMillis: 1000,
+    dueTimestampMillis:
+      defaultSpacedRepetitionSchedulerConfiguration.initialReviewInterval * 2,
+    intervalMillis:
+      defaultSpacedRepetitionSchedulerConfiguration.initialReviewInterval * 2,
+    easeFactor: 2.0,
+  };
+
+  test("increases on success", () => {
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      stateWithEase,
+      stateWithEase.dueTimestampMillis + 100000,
+      TaskRepetitionOutcome.Remembered,
+    );
+    expect(result.easeFactor).toBe(2.1);
+  });
+
+  test("decreases on failure", () => {
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      stateWithEase,
+      stateWithEase.dueTimestampMillis + 100000,
+      TaskRepetitionOutcome.Forgotten,
+    );
+    expect(result.easeFactor).toBe(1.8);
+  });
+
+  test("shrink ignores ease factor", () => {
+    // Use a larger interval so shrunk value stays above initialReviewInterval floor
+    const largeIntervalState: TaskComponentState = {
+      ...stateWithEase,
+      intervalMillis:
+        defaultSpacedRepetitionSchedulerConfiguration.initialReviewInterval * 6,
+    };
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      largeIntervalState,
+      largeIntervalState.dueTimestampMillis + 100000,
+      TaskRepetitionOutcome.Forgotten,
+    );
+    expect(result.intervalMillis).toBe(
+      Math.floor(
+        largeIntervalState.intervalMillis /
+          defaultSpacedRepetitionSchedulerConfiguration.intervalShrinkFactor,
+      ),
+    );
+  });
+
+  test("growth uses per-card ease", () => {
+    const reviewTimestamp = stateWithEase.dueTimestampMillis + 100000;
+    const currentInterval =
+      reviewTimestamp - stateWithEase.lastRepetitionTimestampMillis!;
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      stateWithEase,
+      reviewTimestamp,
+      TaskRepetitionOutcome.Remembered,
+    );
+    expect(result.intervalMillis).toBe(
+      Math.floor(currentInterval * stateWithEase.easeFactor!),
+    );
+  });
+
+  test("capped at maxEaseFactor", () => {
+    const highEaseState = { ...stateWithEase, easeFactor: 2.95 };
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      highEaseState,
+      highEaseState.dueTimestampMillis + 100000,
+      TaskRepetitionOutcome.Remembered,
+    );
+    expect(result.easeFactor).toBe(
+      defaultSpacedRepetitionSchedulerConfiguration.maxEaseFactor,
+    );
+  });
+
+  test("floored at minEaseFactor", () => {
+    const lowEaseState = { ...stateWithEase, easeFactor: 1.35 };
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      lowEaseState,
+      lowEaseState.dueTimestampMillis + 100000,
+      TaskRepetitionOutcome.Forgotten,
+    );
+    expect(result.easeFactor).toBe(
+      defaultSpacedRepetitionSchedulerConfiguration.minEaseFactor,
+    );
+  });
+
+  test("defaults to intervalGrowthFactor when absent", () => {
+    const noEaseState = { ...stateWithEase, easeFactor: undefined };
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      noEaseState,
+      noEaseState.dueTimestampMillis + 100000,
+      TaskRepetitionOutcome.Remembered,
+    );
+    expect(result.easeFactor).toBe(
+      defaultSpacedRepetitionSchedulerConfiguration.intervalGrowthFactor +
+        defaultSpacedRepetitionSchedulerConfiguration.easeIncrement,
+    );
+  });
+});
+
 describe.each([
   { outcome: TaskRepetitionOutcome.Remembered, label: "successful" },
   { outcome: TaskRepetitionOutcome.Skipped, label: "skipped" },
