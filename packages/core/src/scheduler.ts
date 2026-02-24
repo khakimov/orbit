@@ -12,4 +12,5 @@ export interface Scheduler {
 export type SchedulerOutput = {
   dueTimestampMillis: number;
   intervalMillis: number;
+  easeFactor?: number;
 };

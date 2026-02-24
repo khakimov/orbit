@@ -34,9 +34,7 @@ export interface TaskComponentState {
   lastRepetitionTimestampMillis: number | null;
   intervalMillis: number;
   dueTimestampMillis: number; // due timestamp and interval can be changed independently
-
-  // In the future, we'll likely accumulate a full list of reviews here.
-  // We'll likely also support additional simple key/value state management, e.g. to determine which variant of application prompt to show.
+  easeFactor?: number; // per-card growth rate, adapts based on review history (default: intervalGrowthFactor)
 }
 
 /**
