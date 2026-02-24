@@ -55,14 +55,18 @@ function TelegramLinking({ userId }: { userId: string }) {
         "link-telegram",
         { body: { action: "link" } },
       );
-      if (fnError) throw fnError;
+      if (fnError) {
+        const msg = (data as any)?.error;
+        throw new Error(msg ?? fnError.message);
+      }
       const deepLink = (data as { deep_link: string }).deep_link;
       await Linking.openURL(deepLink);
       // Poll for completion after a short delay
       setTimeout(() => fetchStatus(), 5000);
     } catch (e) {
       console.error("Failed to generate linking token:", e);
-      setError("Failed to start linking. Please try again.");
+      const msg = e instanceof Error ? e.message : "Failed to start linking.";
+      setError(msg);
     } finally {
       setActionLoading(false);
     }
