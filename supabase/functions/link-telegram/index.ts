@@ -63,10 +63,13 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const method = req.method;
+    // All actions via POST body to avoid CORS preflight issues with DELETE/GET.
+    // supabase.functions.invoke() always sends POST.
+    const body = await req.json().catch(() => ({}));
+    const action = (body as Record<string, unknown>).action ?? "status";
 
-    // GET -- return current linking status
-    if (method === "GET") {
+    // status -- return current linking status
+    if (action === "status") {
       const { data: profile } = await supabase
         .from("user_profiles")
         .select("telegram_chat_id, telegram_username, telegram_linked_at")
@@ -80,8 +83,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // POST -- generate a linking token and return a deep link
-    if (method === "POST") {
+    // link -- generate a linking token and return a deep link
+    if (action === "link") {
       // Rate limit: one token per 60 seconds
       const { data: existing } = await serviceClient
         .from("user_profiles")
@@ -123,8 +126,8 @@ Deno.serve(async (req) => {
       return jsonResponse({ deep_link: deepLink, expires_at: expiresAt });
     }
 
-    // DELETE -- unlink Telegram account
-    if (method === "DELETE") {
+    // unlink -- remove Telegram account binding
+    if (action === "unlink") {
       const { error: updateError } = await serviceClient
         .from("user_profiles")
         .update({
@@ -143,7 +146,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true });
     }
 
-    return jsonResponse({ error: "Method not allowed" }, 405);
+    return jsonResponse({ error: "Unknown action" }, 400);
   } catch (err) {
     console.error("link-telegram error:", err);
     return jsonResponse({ error: "Internal error" }, 500);

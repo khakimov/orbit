@@ -31,7 +31,7 @@ function TelegramLinking({ userId }: { userId: string }) {
     try {
       const { data, error: fnError } = await supabase.functions.invoke(
         "link-telegram",
-        { method: "GET" },
+        { body: { action: "status" } },
       );
       if (fnError) throw fnError;
       setStatus(data as TelegramStatus);
@@ -53,7 +53,7 @@ function TelegramLinking({ userId }: { userId: string }) {
     try {
       const { data, error: fnError } = await supabase.functions.invoke(
         "link-telegram",
-        { method: "POST" },
+        { body: { action: "link" } },
       );
       if (fnError) throw fnError;
       const deepLink = (data as { deep_link: string }).deep_link;
@@ -74,7 +74,7 @@ function TelegramLinking({ userId }: { userId: string }) {
     try {
       const { error: fnError } = await supabase.functions.invoke(
         "link-telegram",
-        { method: "DELETE" },
+        { body: { action: "unlink" } },
       );
       if (fnError) throw fnError;
       setStatus({ linked: false, telegram_username: null, telegram_linked_at: null });
