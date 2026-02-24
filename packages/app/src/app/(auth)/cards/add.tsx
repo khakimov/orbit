@@ -97,6 +97,7 @@ function MobileContextSection({
   modalVisible,
   setModalVisible,
   contextPreview,
+  scrollViewRef,
 }: {
   context: string;
   setContext: (s: string) => void;
@@ -105,23 +106,34 @@ function MobileContextSection({
   modalVisible: boolean;
   setModalVisible: (v: boolean) => void;
   contextPreview: string | null;
+  scrollViewRef?: React.RefObject<ScrollView>;
 }) {
-  const animatedHeight = useRef(new Animated.Value(0)).current;
-  
-  useEffect(() => {
-    Animated.timing(animatedHeight, {
-      toValue: expanded ? 200 : 0,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
-  }, [expanded, animatedHeight]);
-
+  const containerRef = useRef<View>(null);
   const hasContent = context.length > 0;
+
+  // Scroll to show content when expanded
+  useEffect(() => {
+    if (!expanded || !scrollViewRef?.current || !containerRef.current) return;
+    
+    // Give layout time to settle, then scroll
+    const timeout = setTimeout(() => {
+      containerRef.current?.measureLayout(
+        scrollViewRef.current as any,
+        (x, y) => {
+          scrollViewRef.current?.scrollTo({ y: y - 100, animated: true });
+        },
+        () => {} // onFail
+      );
+    }, 100);
+    
+    return () => clearTimeout(timeout);
+  }, [expanded, scrollViewRef]);
 
   return (
     <>
       {/* Inline collapsible preview */}
       <View
+        ref={containerRef}
         style={{
           marginTop: gridUnit * 2,
           borderWidth: 1,
@@ -156,31 +168,28 @@ function MobileContextSection({
           </Text>
         </Pressable>
 
-        {/* Expanded inline input (200px height) */}
-        <Animated.View style={{ height: animatedHeight, overflow: 'hidden' }}>
-          <View style={{ flex: 1, padding: gridUnit, paddingTop: 0 }}>
-            <ScrollView style={{ flex: 1 }}>
-              <TextInput
-                value={context}
-                onChangeText={setContext}
-                multiline
-                placeholder="Paste reference material, notes, or source text here..."
-                placeholderTextColor={neutral.textSoft}
-                style={{
-                  fontSize: 14,
-                  lineHeight: 20,
-                  color: neutral.text,
-                  minHeight: 180,
-                }}
-              />
-            </ScrollView>
+        {/* Expanded inline input */}
+        {expanded && (
+          <View style={{ padding: gridUnit, paddingTop: 0 }}>
+            <TextInput
+              value={context}
+              onChangeText={setContext}
+              multiline
+              placeholder="Paste reference material, notes, or source text here..."
+              placeholderTextColor={neutral.textSoft}
+              style={{
+                fontSize: 14,
+                lineHeight: 20,
+                color: neutral.text,
+                minHeight: 120,
+              }}
+            />
             {/* Expand button for full modal */}
             <Pressable
               onPress={() => setModalVisible(true)}
               style={{
-                position: 'absolute',
-                bottom: gridUnit,
-                right: gridUnit,
+                alignSelf: 'flex-end',
+                marginTop: gridUnit,
                 backgroundColor: neutral.bg,
                 paddingHorizontal: gridUnit,
                 paddingVertical: gridUnit / 2,
@@ -192,7 +201,7 @@ function MobileContextSection({
               <Text style={{ fontSize: 11, color: neutral.textSoft }}>Expand</Text>
             </Pressable>
           </View>
-        </Animated.View>
+        )}
 
         {/* Collapsed preview (2 lines max) */}
         {!expanded && hasContent && (
@@ -326,6 +335,7 @@ export default function AddCardPage() {
   // Mobile context UI state
   const [contextExpanded, setContextExpanded] = useState(false);
   const [contextModalVisible, setContextModalVisible] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Load pinned context from localStorage on mount
   useEffect(() => {
@@ -574,6 +584,7 @@ export default function AddCardPage() {
         </View>
 
         <ScrollView
+          ref={scrollViewRef}
           style={{ flex: 1 }}
           contentContainerStyle={{
             paddingHorizontal: edgeMargin,
@@ -684,101 +695,6 @@ export default function AddCardPage() {
               )}
             </View>
 
-            {/* Source (new cards only) */}
-            {!editId && (
-              <View style={{ marginTop: gridUnit * 2 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: gridUnit / 2 }}>
-                  <Text
-                    style={[
-                      styles.type.labelSmall.typeStyle,
-                      { color: neutral.textSoft, flex: 1 },
-                    ]}
-                  >
-                    Source
-                  </Text>
-                  {Platform.OS === "web" && (
-                    <Pressable
-                      onPress={() => {
-                        if (sourcePinned) {
-                          localStorage.removeItem("orbit:pinned-source");
-                          setSourcePinned(false);
-                        } else {
-                          localStorage.setItem(
-                            "orbit:pinned-source",
-                            JSON.stringify({ title: sourceTitle, url: sourceUrl }),
-                          );
-                          setSourcePinned(true);
-                        }
-                      }}
-                      style={{
-                        width: 24,
-                        height: 24,
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Text style={{ fontSize: 14, color: sourcePinned ? neutral.accent : neutral.textSoft }}>
-                        {"\u25C9"}
-                      </Text>
-                    </Pressable>
-                  )}
-                </View>
-                <TextInput
-                  value={sourceTitle}
-                  onChangeText={(text) => {
-                    setSourceTitle(text);
-                    if (sourcePinned && Platform.OS === "web") {
-                      localStorage.setItem(
-                        "orbit:pinned-source",
-                        JSON.stringify({ title: text, url: sourceUrl }),
-                      );
-                    }
-                  }}
-                  placeholder="Article title, book, topic..."
-                  placeholderTextColor={neutral.textSoft}
-                  style={{
-                    fontSize: 14,
-                    lineHeight: 20,
-                    padding: gridUnit,
-                    paddingHorizontal: gridUnit * 1.5,
-                    borderRadius,
-                    backgroundColor: neutral.card,
-                    borderWidth: 1,
-                    borderColor: neutral.border,
-                    color: neutral.text,
-                    marginBottom: gridUnit / 2,
-                  }}
-                />
-                <TextInput
-                  value={sourceUrl}
-                  onChangeText={(text) => {
-                    setSourceUrl(text);
-                    if (sourcePinned && Platform.OS === "web") {
-                      localStorage.setItem(
-                        "orbit:pinned-source",
-                        JSON.stringify({ title: sourceTitle, url: text }),
-                      );
-                    }
-                  }}
-                  placeholder="https://..."
-                  placeholderTextColor={neutral.textSoft}
-                  autoCapitalize="none"
-                  keyboardType="url"
-                  style={{
-                    fontSize: 14,
-                    lineHeight: 20,
-                    padding: gridUnit,
-                    paddingHorizontal: gridUnit * 1.5,
-                    borderRadius,
-                    backgroundColor: neutral.card,
-                    borderWidth: 1,
-                    borderColor: neutral.border,
-                    color: neutral.text,
-                  }}
-                />
-              </View>
-            )}
-
             {/* Preview */}
             <Text
               style={[
@@ -861,6 +777,97 @@ export default function AddCardPage() {
                 backgroundColor: neutral.card,
               }}
             >
+              {/* Source (new cards only) */}
+              {!editId && (
+                <View style={{ marginBottom: gridUnit * 2, paddingBottom: gridUnit * 2, borderBottomWidth: 1, borderBottomColor: neutral.border }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: gridUnit / 2 }}>
+                    <Text
+                      style={[
+                        styles.type.labelSmall.typeStyle,
+                        { color: neutral.textSoft, flex: 1 },
+                      ]}
+                    >
+                      Source
+                    </Text>
+                    <Pressable
+                      onPress={() => {
+                        if (sourcePinned) {
+                          localStorage.removeItem("orbit:pinned-source");
+                          setSourcePinned(false);
+                        } else {
+                          localStorage.setItem(
+                            "orbit:pinned-source",
+                            JSON.stringify({ title: sourceTitle, url: sourceUrl }),
+                          );
+                          setSourcePinned(true);
+                        }
+                      }}
+                      style={{
+                        width: 24,
+                        height: 24,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, color: sourcePinned ? neutral.accent : neutral.textSoft }}>
+                        {"\u25C9"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                  <TextInput
+                    value={sourceTitle}
+                    onChangeText={(text) => {
+                      setSourceTitle(text);
+                      if (sourcePinned) {
+                        localStorage.setItem(
+                          "orbit:pinned-source",
+                          JSON.stringify({ title: text, url: sourceUrl }),
+                        );
+                      }
+                    }}
+                    placeholder="Article title, book, topic..."
+                    placeholderTextColor={neutral.textSoft}
+                    style={{
+                      fontSize: 14,
+                      lineHeight: 20,
+                      padding: gridUnit,
+                      borderRadius,
+                      backgroundColor: neutral.bg,
+                      borderWidth: 1,
+                      borderColor: neutral.border,
+                      color: neutral.text,
+                      marginBottom: gridUnit / 2,
+                    }}
+                  />
+                  <TextInput
+                    value={sourceUrl}
+                    onChangeText={(text) => {
+                      setSourceUrl(text);
+                      if (sourcePinned) {
+                        localStorage.setItem(
+                          "orbit:pinned-source",
+                          JSON.stringify({ title: sourceTitle, url: text }),
+                        );
+                      }
+                    }}
+                    placeholder="https://..."
+                    placeholderTextColor={neutral.textSoft}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                    style={{
+                      fontSize: 14,
+                      lineHeight: 20,
+                      padding: gridUnit,
+                      borderRadius,
+                      backgroundColor: neutral.bg,
+                      borderWidth: 1,
+                      borderColor: neutral.border,
+                      color: neutral.text,
+                    }}
+                  />
+                </View>
+              )}
+
               <View style={{ flexDirection: "row", alignItems: "center", marginBottom: gridUnit / 2 }}>
                 <Text
                   style={[
@@ -1045,7 +1052,101 @@ export default function AddCardPage() {
               )}
             </View>
           ) : (
-            /* Mobile: Collapsible inline context */
+            /* Mobile: Source + Collapsible inline context */
+            <>
+            {!editId && (
+              <View style={{ marginTop: gridUnit * 2 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: gridUnit / 2 }}>
+                  <Text
+                    style={[
+                      styles.type.labelSmall.typeStyle,
+                      { color: neutral.textSoft, flex: 1 },
+                    ]}
+                  >
+                    Source
+                  </Text>
+                  {Platform.OS === "web" && (
+                    <Pressable
+                      onPress={() => {
+                        if (sourcePinned) {
+                          localStorage.removeItem("orbit:pinned-source");
+                          setSourcePinned(false);
+                        } else {
+                          localStorage.setItem(
+                            "orbit:pinned-source",
+                            JSON.stringify({ title: sourceTitle, url: sourceUrl }),
+                          );
+                          setSourcePinned(true);
+                        }
+                      }}
+                      style={{
+                        width: 24,
+                        height: 24,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, color: sourcePinned ? neutral.accent : neutral.textSoft }}>
+                        {"\u25C9"}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+                <TextInput
+                  value={sourceTitle}
+                  onChangeText={(text) => {
+                    setSourceTitle(text);
+                    if (sourcePinned && Platform.OS === "web") {
+                      localStorage.setItem(
+                        "orbit:pinned-source",
+                        JSON.stringify({ title: text, url: sourceUrl }),
+                      );
+                    }
+                  }}
+                  placeholder="Article title, book, topic..."
+                  placeholderTextColor={neutral.textSoft}
+                  style={{
+                    fontSize: 14,
+                    lineHeight: 20,
+                    padding: gridUnit,
+                    paddingHorizontal: gridUnit * 1.5,
+                    borderRadius,
+                    backgroundColor: neutral.card,
+                    borderWidth: 1,
+                    borderColor: neutral.border,
+                    color: neutral.text,
+                    marginBottom: gridUnit / 2,
+                  }}
+                />
+                <TextInput
+                  value={sourceUrl}
+                  onChangeText={(text) => {
+                    setSourceUrl(text);
+                    if (sourcePinned && Platform.OS === "web") {
+                      localStorage.setItem(
+                        "orbit:pinned-source",
+                        JSON.stringify({ title: sourceTitle, url: text }),
+                      );
+                    }
+                  }}
+                  placeholder="https://..."
+                  placeholderTextColor={neutral.textSoft}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                  style={{
+                    fontSize: 14,
+                    lineHeight: 20,
+                    padding: gridUnit,
+                    paddingHorizontal: gridUnit * 1.5,
+                    borderRadius,
+                    backgroundColor: neutral.card,
+                    borderWidth: 1,
+                    borderColor: neutral.border,
+                    color: neutral.text,
+                  }}
+                />
+              </View>
+            )}
             <MobileContextSection
               context={context}
               setContext={setContext}
@@ -1054,7 +1155,9 @@ export default function AddCardPage() {
               modalVisible={contextModalVisible}
               setModalVisible={setContextModalVisible}
               contextPreview={contextPreview}
+              scrollViewRef={scrollViewRef}
             />
+            </>
           )}
 
           {/* Mobile: AI Review results below context */}
