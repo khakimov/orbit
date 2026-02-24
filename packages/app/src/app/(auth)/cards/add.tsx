@@ -770,16 +770,11 @@ export default function AddCardPage() {
                 alignSelf: "flex-start",
                 maxHeight: "calc(100vh - 8rem)" as any,
                 overflow: "auto" as any,
-                borderWidth: 1,
-                borderColor: neutral.border,
-                borderRadius,
-                padding: gridUnit * 2,
-                backgroundColor: neutral.card,
               }}
             >
               {/* Source (new cards only) */}
               {!editId && (
-                <View style={{ marginBottom: gridUnit * 2, paddingBottom: gridUnit * 2, borderBottomWidth: 1, borderBottomColor: neutral.border }}>
+                <>
                   <View style={{ flexDirection: "row", alignItems: "center", marginBottom: gridUnit / 2 }}>
                     <Text
                       style={[
@@ -830,9 +825,9 @@ export default function AddCardPage() {
                     style={{
                       fontSize: 14,
                       lineHeight: 20,
-                      padding: gridUnit,
+                      padding: gridUnit * 2,
                       borderRadius,
-                      backgroundColor: neutral.bg,
+                      backgroundColor: neutral.card,
                       borderWidth: 1,
                       borderColor: neutral.border,
                       color: neutral.text,
@@ -857,18 +852,18 @@ export default function AddCardPage() {
                     style={{
                       fontSize: 14,
                       lineHeight: 20,
-                      padding: gridUnit,
+                      padding: gridUnit * 2,
                       borderRadius,
-                      backgroundColor: neutral.bg,
+                      backgroundColor: neutral.card,
                       borderWidth: 1,
                       borderColor: neutral.border,
                       color: neutral.text,
                     }}
                   />
-                </View>
+                </>
               )}
 
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: gridUnit / 2 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: gridUnit * 2, marginBottom: gridUnit / 2 }}>
                 <Text
                   style={[
                     styles.type.labelSmall.typeStyle,
@@ -913,7 +908,11 @@ export default function AddCardPage() {
                 style={{
                   fontSize: 14,
                   lineHeight: 20,
-                  padding: gridUnit,
+                  padding: gridUnit * 2,
+                  borderRadius,
+                  backgroundColor: neutral.card,
+                  borderWidth: 1,
+                  borderColor: neutral.border,
                   color: neutral.text,
                   minHeight: review ? 120 : 300,
                 }}
@@ -928,14 +927,16 @@ export default function AddCardPage() {
                 </View>
               )}
               {review && (
-                <View style={{ marginTop: gridUnit * 2 }}>
-                  <View
-                    style={{
-                      borderTopWidth: 1,
-                      borderTopColor: neutral.border,
-                      paddingTop: gridUnit * 2,
-                    }}
-                  >
+                <View
+                  style={{
+                    marginTop: gridUnit * 2,
+                    padding: gridUnit * 2,
+                    borderRadius,
+                    backgroundColor: neutral.card,
+                    borderWidth: 1,
+                    borderColor: neutral.border,
+                  }}
+                >
                     {/* Verdict badge */}
                     <View style={{ flexDirection: "row", alignItems: "center", gap: gridUnit }}>
                       <View
@@ -1047,7 +1048,6 @@ export default function AddCardPage() {
                         />
                       </View>
                     )}
-                  </View>
                 </View>
               )}
             </View>
@@ -1108,8 +1108,7 @@ export default function AddCardPage() {
                   style={{
                     fontSize: 14,
                     lineHeight: 20,
-                    padding: gridUnit,
-                    paddingHorizontal: gridUnit * 1.5,
+                    padding: gridUnit * 2,
                     borderRadius,
                     backgroundColor: neutral.card,
                     borderWidth: 1,
@@ -1136,8 +1135,7 @@ export default function AddCardPage() {
                   style={{
                     fontSize: 14,
                     lineHeight: 20,
-                    padding: gridUnit,
-                    paddingHorizontal: gridUnit * 1.5,
+                    padding: gridUnit * 2,
                     borderRadius,
                     backgroundColor: neutral.card,
                     borderWidth: 1,
