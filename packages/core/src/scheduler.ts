@@ -1,4 +1,4 @@
-import { TaskComponentState } from "./entities/task.js";
+import { TaskComponentState, TaskID } from "./entities/task.js";
 import { TaskRepetitionOutcome } from "./event.js";
 
 export interface Scheduler {
@@ -6,6 +6,8 @@ export interface Scheduler {
     componentState: TaskComponentState,
     timestampMillis: number,
     outcome: TaskRepetitionOutcome,
+    taskID: TaskID,
+    componentID: string,
   ): SchedulerOutput;
 }
 

@@ -1,4 +1,4 @@
-import { TaskComponentState } from "../entities/task.js";
+import { TaskComponentState, TaskID } from "../entities/task.js";
 import { TaskRepetitionOutcome } from "../event.js";
 import {
   createSpacedRepetitionScheduler,
@@ -6,6 +6,8 @@ import {
 } from "./spacedRepetitionScheduler.js";
 
 const scheduler = createSpacedRepetitionScheduler();
+const testTaskID = "test_task_123" as TaskID;
+const testComponentID = "main";
 
 describe("first repetition", () => {
   const state: TaskComponentState = {
@@ -21,6 +23,8 @@ describe("first repetition", () => {
         state,
         2000,
         TaskRepetitionOutcome.Remembered,
+        testTaskID,
+        testComponentID,
       );
 
     expect(intervalMillis).toBe(
@@ -29,7 +33,7 @@ describe("first repetition", () => {
 
     // Should be small, within jitter.
     expect(dueTimestampMillis - (2000 + intervalMillis)).toMatchInlineSnapshot(
-      `0`,
+      `86000`,
     );
   });
 
@@ -42,6 +46,8 @@ describe("first repetition", () => {
         state,
         reviewTimestampMillis,
         TaskRepetitionOutcome.Remembered,
+        testTaskID,
+        testComponentID,
       );
 
     expect(intervalMillis).toBe(
@@ -55,7 +61,7 @@ describe("first repetition", () => {
     // Should be small, within jitter.
     expect(
       dueTimestampMillis - (reviewTimestampMillis + intervalMillis),
-    ).toMatchInlineSnapshot(`0`);
+    ).toMatchInlineSnapshot(`86000`);
   });
 
   test("skipped", () => {
@@ -64,6 +70,8 @@ describe("first repetition", () => {
         state,
         state.dueTimestampMillis,
         TaskRepetitionOutcome.Skipped,
+        testTaskID,
+        testComponentID,
       );
 
     expect(intervalMillis).toBe(
@@ -75,7 +83,7 @@ describe("first repetition", () => {
     // Should be small, within jitter.
     expect(
       dueTimestampMillis - (state.dueTimestampMillis + intervalMillis),
-    ).toMatchInlineSnapshot(`0`);
+    ).toMatchInlineSnapshot(`86000`);
   });
 
   test("forgotten", () => {
@@ -85,12 +93,14 @@ describe("first repetition", () => {
         state,
         reviewTimestampMillis,
         TaskRepetitionOutcome.Forgotten,
+        testTaskID,
+        testComponentID,
       );
 
     expect(intervalMillis).toBe(0);
-    // Should be roughly ten minutes.
+    // Should be roughly ten minutes + jitter.
     expect(dueTimestampMillis - reviewTimestampMillis).toMatchInlineSnapshot(
-      `600000`,
+      `686000`,
     );
   });
 });
@@ -115,6 +125,8 @@ describe.each([
         testState,
         reviewTimestampMillis,
         outcome,
+        testTaskID,
+        testComponentID,
       );
 
     // Interval should grow by a little more than growth rate (because we remembered for a bit longer than requested).
@@ -127,7 +139,7 @@ describe.each([
     // Should be within jitter.
     expect(
       dueTimestampMillis - (reviewTimestampMillis + intervalMillis),
-    ).toMatchInlineSnapshot(`0`);
+    ).toMatchInlineSnapshot(`86000`);
   });
 
   test("very delayed repetition", () => {
@@ -138,6 +150,8 @@ describe.each([
         testState,
         reviewTimestampMillis,
         outcome,
+        testTaskID,
+        testComponentID,
       );
 
     // Interval should grow by roughly double the normal more than growth rate (because we remembered for around twice as long as requested)
@@ -150,7 +164,7 @@ describe.each([
     // Should be within jitter.
     expect(
       dueTimestampMillis - (reviewTimestampMillis + intervalMillis),
-    ).toMatchInlineSnapshot(`0`);
+    ).toMatchInlineSnapshot(`86000`);
   });
 
   test("too-early repetition", () => {
@@ -161,6 +175,8 @@ describe.each([
         testState,
         reviewTimestampMillis,
         TaskRepetitionOutcome.Remembered,
+        testTaskID,
+        testComponentID,
       );
 
     // The interval should still grow, but less than usual.
@@ -174,7 +190,7 @@ describe.each([
     // Should be within jitter.
     expect(
       dueTimestampMillis - (reviewTimestampMillis + intervalMillis),
-    ).toMatchInlineSnapshot(`0`);
+    ).toMatchInlineSnapshot(`86000`);
   });
 });
 
@@ -200,14 +216,16 @@ test.each([
       testState,
       reviewTimestampMillis,
       TaskRepetitionOutcome.Forgotten,
+      testTaskID,
+      testComponentID,
     );
 
   // Interval should shrink.
   expect(intervalMillis).toBeLessThan(testState.intervalMillis);
 
-  // Should be within jitter.
+  // Should be 10 min retry + jitter.
   expect(dueTimestampMillis - reviewTimestampMillis).toMatchInlineSnapshot(
-    `600000`,
+    `686000`,
   );
 });
 
@@ -227,6 +245,8 @@ describe("per-card ease factor", () => {
       stateWithEase,
       stateWithEase.dueTimestampMillis + 100000,
       TaskRepetitionOutcome.Remembered,
+      testTaskID,
+      testComponentID,
     );
     expect(result.easeFactor).toBe(2.1);
   });
@@ -236,6 +256,8 @@ describe("per-card ease factor", () => {
       stateWithEase,
       stateWithEase.dueTimestampMillis + 100000,
       TaskRepetitionOutcome.Forgotten,
+      testTaskID,
+      testComponentID,
     );
     expect(result.easeFactor).toBe(1.8);
   });
@@ -251,6 +273,8 @@ describe("per-card ease factor", () => {
       largeIntervalState,
       largeIntervalState.dueTimestampMillis + 100000,
       TaskRepetitionOutcome.Forgotten,
+      testTaskID,
+      testComponentID,
     );
     expect(result.intervalMillis).toBe(
       Math.floor(
@@ -268,6 +292,8 @@ describe("per-card ease factor", () => {
       stateWithEase,
       reviewTimestamp,
       TaskRepetitionOutcome.Remembered,
+      testTaskID,
+      testComponentID,
     );
     expect(result.intervalMillis).toBe(
       Math.floor(currentInterval * stateWithEase.easeFactor!),
@@ -280,6 +306,8 @@ describe("per-card ease factor", () => {
       highEaseState,
       highEaseState.dueTimestampMillis + 100000,
       TaskRepetitionOutcome.Remembered,
+      testTaskID,
+      testComponentID,
     );
     expect(result.easeFactor).toBe(
       defaultSpacedRepetitionSchedulerConfiguration.maxEaseFactor,
@@ -292,6 +320,8 @@ describe("per-card ease factor", () => {
       lowEaseState,
       lowEaseState.dueTimestampMillis + 100000,
       TaskRepetitionOutcome.Forgotten,
+      testTaskID,
+      testComponentID,
     );
     expect(result.easeFactor).toBe(
       defaultSpacedRepetitionSchedulerConfiguration.minEaseFactor,
@@ -304,11 +334,84 @@ describe("per-card ease factor", () => {
       noEaseState,
       noEaseState.dueTimestampMillis + 100000,
       TaskRepetitionOutcome.Remembered,
+      testTaskID,
+      testComponentID,
     );
     expect(result.easeFactor).toBe(
       defaultSpacedRepetitionSchedulerConfiguration.intervalGrowthFactor +
         defaultSpacedRepetitionSchedulerConfiguration.easeIncrement,
     );
+  });
+});
+
+describe("stable per-card jitter", () => {
+  const baseState: TaskComponentState = {
+    createdAtTimestampMillis: 0,
+    lastRepetitionTimestampMillis: 1000,
+    dueTimestampMillis: 5000,
+    intervalMillis: 10000,
+    easeFactor: 2.0,
+  };
+
+  test("same card gets same jitter across reviews", () => {
+    const result1 = scheduler.computeNextDueIntervalMillisForRepetition(
+      baseState,
+      6000,
+      TaskRepetitionOutcome.Remembered,
+      "card_abc" as TaskID,
+      "main",
+    );
+    const result2 = scheduler.computeNextDueIntervalMillisForRepetition(
+      baseState,
+      7000, // Different timestamp
+      TaskRepetitionOutcome.Remembered,
+      "card_abc" as TaskID,
+      "main",
+    );
+
+    // Due timestamps differ by exactly 1000ms (the timestamp delta), not jitter
+    const dueDelta = result2.dueTimestampMillis - result1.dueTimestampMillis;
+    expect(dueDelta).toBe(1000);
+  });
+
+  test("different cards get different jitter", () => {
+    const result1 = scheduler.computeNextDueIntervalMillisForRepetition(
+      baseState,
+      6000,
+      TaskRepetitionOutcome.Remembered,
+      "card_abc" as TaskID,
+      "main",
+    );
+    const result2 = scheduler.computeNextDueIntervalMillisForRepetition(
+      baseState,
+      6000, // Same timestamp
+      TaskRepetitionOutcome.Remembered,
+      "card_xyz" as TaskID,
+      "main",
+    );
+
+    // Same interval base, same timestamp, but different jitter → different due times
+    expect(result1.dueTimestampMillis).not.toBe(result2.dueTimestampMillis);
+  });
+
+  test("jitter is within 0-10 minute range", () => {
+    const jitters: number[] = [];
+    for (let i = 0; i < 100; i++) {
+      const result = scheduler.computeNextDueIntervalMillisForRepetition(
+        baseState,
+        6000,
+        TaskRepetitionOutcome.Remembered,
+        `card_${i}` as TaskID,
+        "main",
+      );
+      // jitter = dueTimestamp - timestamp - interval
+      const jitter = result.dueTimestampMillis - 6000 - result.intervalMillis;
+      jitters.push(jitter);
+    }
+
+    // All jitters should be >= 0 and <= 10 minutes (600000ms)
+    expect(Math.min(...jitters)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...jitters)).toBeLessThanOrEqual(600000);
   });
 });
 
@@ -328,6 +431,8 @@ describe.each([
         },
         reviewTimestampMillis,
         outcome,
+        testTaskID,
+        testComponentID,
       );
 
     // After a successful initial retry, the interval should jump from 0 to the initial interval.
@@ -338,7 +443,7 @@ describe.each([
     // Should be within jitter.
     expect(
       dueTimestampMillis - (reviewTimestampMillis + intervalMillis),
-    ).toMatchInlineSnapshot(`0`);
+    ).toMatchInlineSnapshot(`86000`);
   });
 
   test("with past success", () => {
@@ -357,6 +462,8 @@ describe.each([
         },
         reviewTimestampMillis,
         outcome,
+        testTaskID,
+        testComponentID,
       );
 
     // The interval shouldn't grow.
@@ -367,7 +474,7 @@ describe.each([
     // Should be within jitter.
     expect(
       dueTimestampMillis - (reviewTimestampMillis + intervalMillis),
-    ).toMatchInlineSnapshot(`0`);
+    ).toMatchInlineSnapshot(`86000`);
   });
 
   test("very delayed, with past success", () => {
@@ -388,6 +495,8 @@ describe.each([
         },
         reviewTimestampMillis,
         outcome,
+        testTaskID,
+        testComponentID,
       );
 
     // Because they waited so long, and still rememberd, the interval should grow.
@@ -398,6 +507,6 @@ describe.each([
     // Should be within jitter.
     expect(
       dueTimestampMillis - (reviewTimestampMillis + intervalMillis),
-    ).toMatchInlineSnapshot(`0`);
+    ).toMatchInlineSnapshot(`86000`);
   });
 });

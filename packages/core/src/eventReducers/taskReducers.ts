@@ -76,6 +76,8 @@ export function taskRepetitionEventReducer(
         oldState,
         event.timestampMillis,
         event.outcome,
+        oldSnapshot.id,
+        event.componentID,
       ),
     }),
   );

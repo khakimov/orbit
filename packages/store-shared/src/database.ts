@@ -61,15 +61,25 @@ export class Database {
           ]);
         }
 
-        const entityUpdates = await Promise.all(
-          [...eventsByEntityID.entries()].map(([id, events]) =>
-            this._computeUpdatedEntitySnapshot(
+        const entityUpdates: { event: Event; entity: Entity }[][] = [];
+        for (const [id, events] of eventsByEntityID.entries()) {
+          try {
+            const updates = await this._computeUpdatedEntitySnapshot(
               id,
               currentEntityRecordMap.get(id) ?? null,
               events,
-            ),
-          ),
-        );
+            );
+            entityUpdates.push(updates);
+          } catch (error) {
+            // Orphan events (e.g. repetition without ingest) can arrive
+            // during sync when events are pulled out of causal order.
+            // Skip this entity — its events are still stored, so the next
+            // sync that brings the missing ingest will reconstruct it.
+            console.warn(
+              `[Database] Skipping entity ${id}: ${error instanceof Error ? error.message : error}`,
+            );
+          }
+        }
 
         output = entityUpdates.flat();
         return new Map(

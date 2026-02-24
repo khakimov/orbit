@@ -1,6 +1,17 @@
-import { TaskComponentState } from "../entities/task.js";
+import { TaskComponentState, TaskID } from "../entities/task.js";
 import { TaskRepetitionOutcome } from "../event.js";
 import { Scheduler, SchedulerOutput } from "../scheduler.js";
+
+// Simple string hash for stable per-card jitter
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
+}
 
 export const defaultSpacedRepetitionSchedulerConfiguration = {
   intervalGrowthFactor: 2.3, // default ease for new cards / cards without history
@@ -30,6 +41,8 @@ export function createSpacedRepetitionScheduler(
       componentState: TaskComponentState,
       timestampMillis: number,
       outcome: TaskRepetitionOutcome,
+      taskID: TaskID,
+      componentID: string,
     ): SchedulerOutput {
       const currentReviewIntervalMillis = Math.max(
         0,
@@ -93,8 +106,10 @@ export function createSpacedRepetitionScheduler(
         }
       }
 
-      // Small offset so prompts don't always end up in the same order. Maximum jitter is 10 minutes.
-      const jitter = (timestampMillis % 1000) * (60 * 10);
+      // Stable per-card jitter so prompts don't cluster. Same card always gets same offset.
+      // Hash combines taskID and componentID for unique jitter per card component.
+      const hash = hashString(`${taskID}:${componentID}`);
+      const jitter = (hash % 600) * 1000; // 0–600 seconds → 0–10 minutes
       const newDueTimestampMillis =
         timestampMillis +
         jitter +
