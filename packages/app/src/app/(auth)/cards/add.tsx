@@ -319,6 +319,9 @@ export default function AddCardPage() {
   const [review, setReview] = useState<CardReview | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [contextPinned, setContextPinned] = useState(false);
+  const [sourceTitle, setSourceTitle] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [sourcePinned, setSourcePinned] = useState(false);
   
   // Mobile context UI state
   const [contextExpanded, setContextExpanded] = useState(false);
@@ -334,6 +337,23 @@ export default function AddCardPage() {
         setContextPinned(true);
       }
     } catch {}
+  }, []);
+
+  // Load pinned source from localStorage on mount
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    try {
+      const saved = localStorage.getItem("orbit:pinned-source");
+      if (saved) {
+        const parsed = JSON.parse(saved) as { title?: string; url?: string };
+        if (parsed.title) setSourceTitle(parsed.title);
+        if (parsed.url) setSourceUrl(parsed.url);
+        setSourcePinned(true);
+      }
+    } catch (e) {
+      console.warn("Failed to load pinned source:", e);
+      localStorage.removeItem("orbit:pinned-source");
+    }
   }, []);
 
   // Warn before navigating away with unsaved content
@@ -457,7 +477,13 @@ export default function AddCardPage() {
           entityID: generateUniqueID<TaskID>(),
           timestampMillis: Date.now(),
           spec,
-          provenance: null,
+          provenance: sourceTitle.trim() || sourceUrl.trim()
+            ? {
+                identifier: sourceUrl.trim() || `source:${sourceTitle.trim().toLowerCase().replace(/\s+/g, "-")}`,
+                ...(sourceUrl.trim() ? { url: sourceUrl.trim() } : {}),
+                ...(sourceTitle.trim() ? { title: sourceTitle.trim() } : {}),
+              }
+            : null,
         };
         events.push(taskIngestEvent);
       }
@@ -472,6 +498,10 @@ export default function AddCardPage() {
         setAnswer("");
         setImage(null);
         if (!contextPinned) setContext("");
+        if (!sourcePinned) {
+          setSourceTitle("");
+          setSourceUrl("");
+        }
         setReview(null);
         setReviewError(null);
         showToast("Saved!");
@@ -653,6 +683,101 @@ export default function AddCardPage() {
                 </View>
               )}
             </View>
+
+            {/* Source (new cards only) */}
+            {!editId && (
+              <View style={{ marginTop: gridUnit * 2 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: gridUnit / 2 }}>
+                  <Text
+                    style={[
+                      styles.type.labelSmall.typeStyle,
+                      { color: neutral.textSoft, flex: 1 },
+                    ]}
+                  >
+                    Source
+                  </Text>
+                  {Platform.OS === "web" && (
+                    <Pressable
+                      onPress={() => {
+                        if (sourcePinned) {
+                          localStorage.removeItem("orbit:pinned-source");
+                          setSourcePinned(false);
+                        } else {
+                          localStorage.setItem(
+                            "orbit:pinned-source",
+                            JSON.stringify({ title: sourceTitle, url: sourceUrl }),
+                          );
+                          setSourcePinned(true);
+                        }
+                      }}
+                      style={{
+                        width: 24,
+                        height: 24,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, color: sourcePinned ? neutral.accent : neutral.textSoft }}>
+                        {"\u25C9"}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+                <TextInput
+                  value={sourceTitle}
+                  onChangeText={(text) => {
+                    setSourceTitle(text);
+                    if (sourcePinned && Platform.OS === "web") {
+                      localStorage.setItem(
+                        "orbit:pinned-source",
+                        JSON.stringify({ title: text, url: sourceUrl }),
+                      );
+                    }
+                  }}
+                  placeholder="Article title, book, topic..."
+                  placeholderTextColor={neutral.textSoft}
+                  style={{
+                    fontSize: 14,
+                    lineHeight: 20,
+                    padding: gridUnit,
+                    paddingHorizontal: gridUnit * 1.5,
+                    borderRadius,
+                    backgroundColor: neutral.card,
+                    borderWidth: 1,
+                    borderColor: neutral.border,
+                    color: neutral.text,
+                    marginBottom: gridUnit / 2,
+                  }}
+                />
+                <TextInput
+                  value={sourceUrl}
+                  onChangeText={(text) => {
+                    setSourceUrl(text);
+                    if (sourcePinned && Platform.OS === "web") {
+                      localStorage.setItem(
+                        "orbit:pinned-source",
+                        JSON.stringify({ title: sourceTitle, url: text }),
+                      );
+                    }
+                  }}
+                  placeholder="https://..."
+                  placeholderTextColor={neutral.textSoft}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                  style={{
+                    fontSize: 14,
+                    lineHeight: 20,
+                    padding: gridUnit,
+                    paddingHorizontal: gridUnit * 1.5,
+                    borderRadius,
+                    backgroundColor: neutral.card,
+                    borderWidth: 1,
+                    borderColor: neutral.border,
+                    color: neutral.text,
+                  }}
+                />
+              </View>
+            )}
 
             {/* Preview */}
             <Text
