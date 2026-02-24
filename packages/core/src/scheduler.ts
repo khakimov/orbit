@@ -6,8 +6,8 @@ export interface Scheduler {
     componentState: TaskComponentState,
     timestampMillis: number,
     outcome: TaskRepetitionOutcome,
-    taskID: TaskID,
-    componentID: string,
+    taskID?: TaskID,
+    componentID?: string,
   ): SchedulerOutput;
 }
 

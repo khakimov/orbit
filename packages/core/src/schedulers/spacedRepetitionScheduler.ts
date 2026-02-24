@@ -41,8 +41,8 @@ export function createSpacedRepetitionScheduler(
       componentState: TaskComponentState,
       timestampMillis: number,
       outcome: TaskRepetitionOutcome,
-      taskID: TaskID,
-      componentID: string,
+      taskID?: TaskID,
+      componentID?: string,
     ): SchedulerOutput {
       const currentReviewIntervalMillis = Math.max(
         0,
