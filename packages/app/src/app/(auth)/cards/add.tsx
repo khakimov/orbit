@@ -18,7 +18,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Animated,
   Image,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -34,6 +33,7 @@ import {
 import { neutral, NavButton } from "../../../components/PageShared.js";
 import { useDatabaseManager } from "../../../hooks/useDatabaseManager.js";
 import { supabase } from "../../../authentication/supabaseClient.js";
+import { ContextSection } from "./ContextSection.js";
 
 interface CardReview {
   verdict: "good" | "needs_work" | "poor";
@@ -88,217 +88,6 @@ async function fetchImageBytes(uri: string): Promise<Uint8Array> {
   return new Uint8Array(buffer);
 }
 
-// Mobile: Collapsible inline context with full-screen modal editing
-function MobileContextSection({
-  context,
-  setContext,
-  expanded,
-  setExpanded,
-  modalVisible,
-  setModalVisible,
-  contextPreview,
-  scrollViewRef,
-}: {
-  context: string;
-  setContext: (s: string) => void;
-  expanded: boolean;
-  setExpanded: (v: boolean) => void;
-  modalVisible: boolean;
-  setModalVisible: (v: boolean) => void;
-  contextPreview: string | null;
-  scrollViewRef?: React.RefObject<ScrollView>;
-}) {
-  const containerRef = useRef<View>(null);
-  const hasContent = context.length > 0;
-
-  // Scroll to show content when expanded
-  useEffect(() => {
-    if (!expanded || !scrollViewRef?.current || !containerRef.current) return;
-    
-    // Give layout time to settle, then scroll
-    const timeout = setTimeout(() => {
-      containerRef.current?.measureLayout(
-        scrollViewRef.current as any,
-        (x, y) => {
-          scrollViewRef.current?.scrollTo({ y: y - 100, animated: true });
-        },
-        () => {} // onFail
-      );
-    }, 100);
-    
-    return () => clearTimeout(timeout);
-  }, [expanded, scrollViewRef]);
-
-  return (
-    <>
-      {/* Inline collapsible preview */}
-      <View
-        ref={containerRef}
-        style={{
-          marginTop: gridUnit * 2,
-          borderWidth: 1,
-          borderColor: neutral.border,
-          borderRadius,
-          backgroundColor: neutral.card,
-          overflow: 'hidden',
-        }}
-      >
-        {/* Header - tap to expand/collapse, long press for modal */}
-        <Pressable
-          onPress={() => setExpanded(!expanded)}
-          onLongPress={() => setModalVisible(true)}
-          delayLongPress={400}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            padding: gridUnit,
-            paddingHorizontal: gridUnit * 1.5,
-          }}
-        >
-          <Text style={[styles.type.labelSmall.typeStyle, { color: neutral.textSoft, flex: 1 }]}>
-            {"📄 Context "}
-            {hasContent && (
-              <Text style={{ fontSize: 10, color: neutral.textSoft }}>
-                {`~${Math.ceil(context.length / 4)} tokens`}
-              </Text>
-            )}
-          </Text>
-          <Text style={{ color: neutral.textSoft, fontSize: 12 }}>
-            {expanded ? '▼' : hasContent ? '▶' : '+'}
-          </Text>
-        </Pressable>
-
-        {/* Expanded inline input */}
-        {expanded && (
-          <View style={{ padding: gridUnit, paddingTop: 0 }}>
-            <TextInput
-              value={context}
-              onChangeText={setContext}
-              multiline
-              placeholder="Paste reference material, notes, or source text here..."
-              placeholderTextColor={neutral.textSoft}
-              style={{
-                fontSize: 14,
-                lineHeight: 20,
-                color: neutral.text,
-                minHeight: 120,
-              }}
-            />
-            {/* Expand button for full modal */}
-            <Pressable
-              onPress={() => setModalVisible(true)}
-              style={{
-                alignSelf: 'flex-end',
-                marginTop: gridUnit,
-                backgroundColor: neutral.bg,
-                paddingHorizontal: gridUnit,
-                paddingVertical: gridUnit / 2,
-                borderRadius: borderRadius / 2,
-                borderWidth: 1,
-                borderColor: neutral.border,
-              }}
-            >
-              <Text style={{ fontSize: 11, color: neutral.textSoft }}>Expand</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {/* Collapsed preview (2 lines max) */}
-        {!expanded && hasContent && (
-          <View style={{ padding: gridUnit, paddingTop: 0 }}>
-            <Text
-              numberOfLines={2}
-              style={[styles.type.runningTextSmall.typeStyle, { color: neutral.text }]}
-            >
-              {contextPreview}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Full-screen modal for deep editing */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: neutral.bg }}>
-          {/* Modal Header */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: gridUnit * 2,
-              paddingTop: gridUnit * 3,
-              paddingBottom: gridUnit * 2,
-              borderBottomWidth: 1,
-              borderBottomColor: neutral.border,
-              backgroundColor: neutral.card,
-            }}
-          >
-            <Text style={[styles.type.headline.layoutStyle, { color: neutral.text }]}>
-              Context
-            </Text>
-            <Pressable
-              onPress={() => setModalVisible(false)}
-              style={{
-                paddingHorizontal: gridUnit * 1.5,
-                paddingVertical: gridUnit / 2,
-                backgroundColor: neutral.accent,
-                borderRadius,
-              }}
-            >
-              <Text style={[styles.type.labelSmall.typeStyle, { color: '#fff' }]}>
-                Done
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Modal Content */}
-          <ScrollView style={{ flex: 1 }}>
-            <TextInput
-              value={context}
-              onChangeText={setContext}
-              multiline
-              autoFocus
-              placeholder="Paste reference material, notes, or source text here..."
-              placeholderTextColor={neutral.textSoft}
-              style={{
-                fontSize: 16,
-                lineHeight: 24,
-                color: neutral.text,
-                padding: gridUnit * 2,
-                minHeight: 400,
-              }}
-            />
-          </ScrollView>
-
-          {/* Footer with token count */}
-          <View
-            style={{
-              padding: gridUnit * 2,
-              borderTopWidth: 1,
-              borderTopColor: neutral.border,
-              backgroundColor: neutral.card,
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Text style={[styles.type.labelSmall.typeStyle, { color: neutral.textSoft }]}>
-              {context.length} characters
-            </Text>
-            <Text style={[styles.type.labelSmall.typeStyle, { color: neutral.textSoft }]}>
-              ~{Math.ceil(context.length / 4)} tokens
-            </Text>
-          </View>
-        </View>
-      </Modal>
-    </>
-  );
-}
-
 export default function AddCardPage() {
   const params = useLocalSearchParams<{
     editId?: string;
@@ -332,9 +121,6 @@ export default function AddCardPage() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourcePinned, setSourcePinned] = useState(false);
   
-  // Mobile context UI state
-  const [contextExpanded, setContextExpanded] = useState(false);
-  const [contextModalVisible, setContextModalVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Load pinned context from localStorage on mount
@@ -543,14 +329,6 @@ export default function AddCardPage() {
 
   const { width } = useWindowDimensions();
   const isWide = width >= 768;
-  
-  // Get preview text (first 2 lines max 100 chars)
-  const contextPreview = useMemo(() => {
-    if (!context) return null;
-    const firstLine = context.split('\n')[0];
-    return firstLine.length > 100 ? firstLine.slice(0, 100) + '...' : firstLine;
-  }, [context]);
-
   return (
     <View style={{ backgroundColor: neutral.bg, flex: 1 }}>
       <View
@@ -766,7 +544,7 @@ export default function AddCardPage() {
                 flex: 1,
                 marginLeft: gridUnit * 3,
                 position: "sticky" as any,
-                top: gridUnit * 2,
+                top: 0,
                 alignSelf: "flex-start",
                 maxHeight: "calc(100vh - 8rem)" as any,
                 overflow: "auto" as any,
@@ -863,59 +641,13 @@ export default function AddCardPage() {
                 </>
               )}
 
-              <View style={{ flexDirection: "row", alignItems: "center", marginTop: gridUnit * 2, marginBottom: gridUnit / 2 }}>
-                <Text
-                  style={[
-                    styles.type.labelSmall.typeStyle,
-                    { color: neutral.textSoft, flex: 1 },
-                  ]}
-                >
-                  {"Context  "}{context.length > 0 && (<Text style={{ fontSize: 10, color: neutral.textSoft }}>{`~${Math.ceil(context.length / 4)} tokens`}</Text>)}
-                </Text>
-                <Pressable
-                  onPress={() => {
-                    if (contextPinned) {
-                      localStorage.removeItem("orbit:pinned-context");
-                      setContextPinned(false);
-                    } else {
-                      localStorage.setItem("orbit:pinned-context", context);
-                      setContextPinned(true);
-                    }
-                  }}
-                  style={{
-                    width: 24,
-                    height: 24,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Text style={{ fontSize: 14, color: contextPinned ? neutral.accent : neutral.textSoft }}>
-                    {"\u25C9"}
-                  </Text>
-                </Pressable>
-              </View>
-              <TextInput
+              <ContextSection
                 value={context}
-                onChangeText={(text) => {
-                  setContext(text);
-                  if (contextPinned) {
-                    localStorage.setItem("orbit:pinned-context", text);
-                  }
-                }}
-                multiline
-                placeholder="Scratchpad for notes, source material, context..."
-                placeholderTextColor={neutral.textSoft}
-                style={{
-                  fontSize: 14,
-                  lineHeight: 20,
-                  padding: gridUnit * 2,
-                  borderRadius,
-                  backgroundColor: neutral.card,
-                  borderWidth: 1,
-                  borderColor: neutral.border,
-                  color: neutral.text,
-                  minHeight: review ? 120 : 300,
-                }}
+                onChangeText={setContext}
+                pinned={contextPinned}
+                onPinnedChange={setContextPinned}
+                isWide
+                hasReview={!!review}
               />
 
               {/* AI Review results */}
@@ -1145,14 +877,12 @@ export default function AddCardPage() {
                 />
               </View>
             )}
-            <MobileContextSection
-              context={context}
-              setContext={setContext}
-              expanded={contextExpanded}
-              setExpanded={setContextExpanded}
-              modalVisible={contextModalVisible}
-              setModalVisible={setContextModalVisible}
-              contextPreview={contextPreview}
+            <ContextSection
+              value={context}
+              onChangeText={setContext}
+              pinned={contextPinned}
+              onPinnedChange={setContextPinned}
+              isWide={false}
               scrollViewRef={scrollViewRef}
             />
             </>
