@@ -35,6 +35,7 @@ export interface TaskComponentState {
   intervalMillis: number;
   dueTimestampMillis: number; // due timestamp and interval can be changed independently
   easeFactor?: number; // per-card growth rate, adapts based on review history (default: intervalGrowthFactor)
+  learningStep?: number; // index into learningSteps array; undefined = graduated to spaced review
 }
 
 /**

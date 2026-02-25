@@ -21,6 +21,7 @@ export const defaultSpacedRepetitionSchedulerConfiguration = {
   easeDecrement: 0.2, // ease shrinks by this on failure
   minEaseFactor: 1.3,
   maxEaseFactor: 3.0,
+  learningSteps: [60_000, 600_000] as number[], // 1min, 10min — steps before graduating to spaced review
 };
 
 export interface SpacedRepetitionSchedulerConfiguration {
@@ -31,6 +32,7 @@ export interface SpacedRepetitionSchedulerConfiguration {
   easeDecrement: number;
   minEaseFactor: number;
   maxEaseFactor: number;
+  learningSteps: number[];
 }
 
 export function createSpacedRepetitionScheduler(
@@ -44,6 +46,68 @@ export function createSpacedRepetitionScheduler(
       taskID?: TaskID,
       componentID?: string,
     ): SchedulerOutput {
+      const { learningSteps } = schedulerConfiguration;
+      const remembered =
+        outcome === TaskRepetitionOutcome.Remembered ||
+        outcome === TaskRepetitionOutcome.Skipped;
+
+      // --- Learning phase: card has not yet graduated to spaced review ---
+      if (componentState.learningStep != null) {
+        if (remembered) {
+          const nextStep = componentState.learningStep + 1;
+          if (nextStep >= learningSteps.length) {
+            // Graduate: enter spaced review
+            const hash = hashString(`${taskID}:${componentID}`);
+            const jitter = (hash % 600) * 1000;
+            return {
+              dueTimestampMillis:
+                timestampMillis +
+                schedulerConfiguration.initialReviewInterval +
+                jitter,
+              intervalMillis: schedulerConfiguration.initialReviewInterval,
+              easeFactor:
+                schedulerConfiguration.intervalGrowthFactor +
+                schedulerConfiguration.easeIncrement,
+              learningStep: undefined,
+            };
+          }
+          // Advance to next learning step (no jitter — exact timing matters)
+          return {
+            dueTimestampMillis: timestampMillis + learningSteps[nextStep],
+            intervalMillis: 0,
+            easeFactor: componentState.easeFactor,
+            learningStep: nextStep,
+          };
+        }
+        // Forgotten during learning: back to step 0
+        return {
+          dueTimestampMillis: timestampMillis + learningSteps[0],
+          intervalMillis: 0,
+          easeFactor: componentState.easeFactor,
+          learningStep: 0,
+        };
+      }
+
+      // --- First review of a brand-new card: enter learning phase ---
+      if (componentState.intervalMillis === 0 && componentState.learningStep === undefined) {
+        if (remembered) {
+          return {
+            dueTimestampMillis: timestampMillis + learningSteps[1],
+            intervalMillis: 0,
+            easeFactor: componentState.easeFactor,
+            learningStep: 1,
+          };
+        }
+        // Forgotten on first review
+        return {
+          dueTimestampMillis: timestampMillis + learningSteps[0],
+          intervalMillis: 0,
+          easeFactor: componentState.easeFactor,
+          learningStep: 0,
+        };
+      }
+
+      // --- Graduated card: existing spaced repetition logic ---
       const currentReviewIntervalMillis = Math.max(
         0,
         timestampMillis -
@@ -59,10 +123,7 @@ export function createSpacedRepetitionScheduler(
       let newIntervalMillis: number;
       let newEaseFactor: number;
 
-      if (
-        outcome === TaskRepetitionOutcome.Remembered ||
-        outcome === TaskRepetitionOutcome.Skipped
-      ) {
+      if (remembered) {
         // Growth uses per-card ease factor
         newEaseFactor = Math.min(
           easeFactor + schedulerConfiguration.easeIncrement,
@@ -109,7 +170,7 @@ export function createSpacedRepetitionScheduler(
       // Stable per-card jitter so prompts don't cluster. Same card always gets same offset.
       // Hash combines taskID and componentID for unique jitter per card component.
       const hash = hashString(`${taskID}:${componentID}`);
-      const jitter = (hash % 600) * 1000; // 0–600 seconds → 0–10 minutes
+      const jitter = (hash % 600) * 1000; // 0-600 seconds -> 0-10 minutes
       const newDueTimestampMillis =
         timestampMillis +
         jitter +

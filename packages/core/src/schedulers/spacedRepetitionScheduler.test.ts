@@ -9,7 +9,7 @@ const scheduler = createSpacedRepetitionScheduler();
 const testTaskID = "test_task_123" as TaskID;
 const testComponentID = "main";
 
-describe("first repetition", () => {
+describe("first repetition (enters learning)", () => {
   const state: TaskComponentState = {
     createdAtTimestampMillis: 1000,
     lastRepetitionTimestampMillis: null,
@@ -17,91 +17,255 @@ describe("first repetition", () => {
     intervalMillis: 0,
   };
 
-  test("remembered almost immediately", () => {
-    const { dueTimestampMillis, intervalMillis } =
-      scheduler.computeNextDueIntervalMillisForRepetition(
-        state,
-        2000,
-        TaskRepetitionOutcome.Remembered,
-        testTaskID,
-        testComponentID,
-      );
-
-    expect(intervalMillis).toBe(
-      defaultSpacedRepetitionSchedulerConfiguration.initialReviewInterval,
+  test("remembered -> learning step 1, due in 10min", () => {
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      2000,
+      TaskRepetitionOutcome.Remembered,
+      testTaskID,
+      testComponentID,
     );
 
-    // Should be small, within jitter.
-    expect(dueTimestampMillis - (2000 + intervalMillis)).toMatchInlineSnapshot(
-      `86000`,
-    );
+    expect(result.intervalMillis).toBe(0);
+    expect(result.learningStep).toBe(1);
+    expect(result.dueTimestampMillis).toBe(2000 + 600_000); // 10 min
   });
 
-  test("remembered with long delay", () => {
+  test("remembered with long delay still enters learning", () => {
     const reviewTimestampMillis =
       state.dueTimestampMillis +
       defaultSpacedRepetitionSchedulerConfiguration.initialReviewInterval * 2;
-    const { dueTimestampMillis, intervalMillis } =
-      scheduler.computeNextDueIntervalMillisForRepetition(
-        state,
-        reviewTimestampMillis,
-        TaskRepetitionOutcome.Remembered,
-        testTaskID,
-        testComponentID,
-      );
-
-    expect(intervalMillis).toBe(
-      Math.floor(
-        defaultSpacedRepetitionSchedulerConfiguration.initialReviewInterval *
-          2 *
-          defaultSpacedRepetitionSchedulerConfiguration.intervalGrowthFactor,
-      ),
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      reviewTimestampMillis,
+      TaskRepetitionOutcome.Remembered,
+      testTaskID,
+      testComponentID,
     );
 
-    // Should be small, within jitter.
-    expect(
-      dueTimestampMillis - (reviewTimestampMillis + intervalMillis),
-    ).toMatchInlineSnapshot(`86000`);
+    // Still enters learning regardless of delay
+    expect(result.intervalMillis).toBe(0);
+    expect(result.learningStep).toBe(1);
+    expect(result.dueTimestampMillis).toBe(reviewTimestampMillis + 600_000);
   });
 
-  test("skipped", () => {
-    const { dueTimestampMillis, intervalMillis } =
-      scheduler.computeNextDueIntervalMillisForRepetition(
-        state,
-        state.dueTimestampMillis,
-        TaskRepetitionOutcome.Skipped,
-        testTaskID,
-        testComponentID,
-      );
-
-    expect(intervalMillis).toBe(
-      Math.floor(
-        defaultSpacedRepetitionSchedulerConfiguration.initialReviewInterval,
-      ),
+  test("skipped -> learning step 1, due in 10min", () => {
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      state.dueTimestampMillis,
+      TaskRepetitionOutcome.Skipped,
+      testTaskID,
+      testComponentID,
     );
 
-    // Should be small, within jitter.
-    expect(
-      dueTimestampMillis - (state.dueTimestampMillis + intervalMillis),
-    ).toMatchInlineSnapshot(`86000`);
+    expect(result.intervalMillis).toBe(0);
+    expect(result.learningStep).toBe(1);
+    expect(result.dueTimestampMillis).toBe(state.dueTimestampMillis + 600_000);
   });
 
-  test("forgotten", () => {
+  test("forgotten -> learning step 0, due in 1min", () => {
     const reviewTimestampMillis = 10000;
-    const { dueTimestampMillis, intervalMillis } =
-      scheduler.computeNextDueIntervalMillisForRepetition(
-        state,
-        reviewTimestampMillis,
-        TaskRepetitionOutcome.Forgotten,
-        testTaskID,
-        testComponentID,
-      );
-
-    expect(intervalMillis).toBe(0);
-    // Should be roughly ten minutes + jitter.
-    expect(dueTimestampMillis - reviewTimestampMillis).toMatchInlineSnapshot(
-      `686000`,
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      reviewTimestampMillis,
+      TaskRepetitionOutcome.Forgotten,
+      testTaskID,
+      testComponentID,
     );
+
+    expect(result.intervalMillis).toBe(0);
+    expect(result.learningStep).toBe(0);
+    expect(result.dueTimestampMillis).toBe(reviewTimestampMillis + 60_000);
+  });
+});
+
+describe("learning steps", () => {
+  const config = defaultSpacedRepetitionSchedulerConfiguration;
+
+  test("step 1 remembered -> graduates with 5-day interval", () => {
+    const state: TaskComponentState = {
+      createdAtTimestampMillis: 0,
+      lastRepetitionTimestampMillis: 1000,
+      dueTimestampMillis: 2000,
+      intervalMillis: 0,
+      learningStep: 1,
+    };
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      2000,
+      TaskRepetitionOutcome.Remembered,
+      testTaskID,
+      testComponentID,
+    );
+
+    expect(result.intervalMillis).toBe(config.initialReviewInterval);
+    expect(result.learningStep).toBeUndefined();
+    // Due = now + 5 days + jitter
+    const jitter = result.dueTimestampMillis - 2000 - config.initialReviewInterval;
+    expect(jitter).toBeGreaterThanOrEqual(0);
+    expect(jitter).toBeLessThanOrEqual(600_000);
+  });
+
+  test("step 1 forgotten -> back to step 0, due in 1min", () => {
+    const state: TaskComponentState = {
+      createdAtTimestampMillis: 0,
+      lastRepetitionTimestampMillis: 1000,
+      dueTimestampMillis: 2000,
+      intervalMillis: 0,
+      learningStep: 1,
+    };
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      2000,
+      TaskRepetitionOutcome.Forgotten,
+      testTaskID,
+      testComponentID,
+    );
+
+    expect(result.intervalMillis).toBe(0);
+    expect(result.learningStep).toBe(0);
+    expect(result.dueTimestampMillis).toBe(2000 + 60_000);
+  });
+
+  test("step 0 remembered -> step 1, due in 10min", () => {
+    const state: TaskComponentState = {
+      createdAtTimestampMillis: 0,
+      lastRepetitionTimestampMillis: 1000,
+      dueTimestampMillis: 2000,
+      intervalMillis: 0,
+      learningStep: 0,
+    };
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      2000,
+      TaskRepetitionOutcome.Remembered,
+      testTaskID,
+      testComponentID,
+    );
+
+    expect(result.intervalMillis).toBe(0);
+    expect(result.learningStep).toBe(1);
+    expect(result.dueTimestampMillis).toBe(2000 + 600_000);
+  });
+
+  test("step 0 forgotten -> stays step 0, due in 1min", () => {
+    const state: TaskComponentState = {
+      createdAtTimestampMillis: 0,
+      lastRepetitionTimestampMillis: 1000,
+      dueTimestampMillis: 2000,
+      intervalMillis: 0,
+      learningStep: 0,
+    };
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      2000,
+      TaskRepetitionOutcome.Forgotten,
+      testTaskID,
+      testComponentID,
+    );
+
+    expect(result.intervalMillis).toBe(0);
+    expect(result.learningStep).toBe(0);
+    expect(result.dueTimestampMillis).toBe(2000 + 60_000);
+  });
+
+  test("ease unchanged during learning", () => {
+    const state: TaskComponentState = {
+      createdAtTimestampMillis: 0,
+      lastRepetitionTimestampMillis: 1000,
+      dueTimestampMillis: 2000,
+      intervalMillis: 0,
+      easeFactor: 2.0,
+      learningStep: 0,
+    };
+
+    const remembered = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      2000,
+      TaskRepetitionOutcome.Remembered,
+      testTaskID,
+      testComponentID,
+    );
+    expect(remembered.easeFactor).toBe(2.0);
+
+    const forgotten = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      2000,
+      TaskRepetitionOutcome.Forgotten,
+      testTaskID,
+      testComponentID,
+    );
+    expect(forgotten.easeFactor).toBe(2.0);
+  });
+
+  test("no jitter during learning steps", () => {
+    const state: TaskComponentState = {
+      createdAtTimestampMillis: 0,
+      lastRepetitionTimestampMillis: 1000,
+      dueTimestampMillis: 2000,
+      intervalMillis: 0,
+      learningStep: 0,
+    };
+
+    // Different cards should get identical due times during learning
+    const result1 = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      2000,
+      TaskRepetitionOutcome.Remembered,
+      "card_abc" as TaskID,
+      "main",
+    );
+    const result2 = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      2000,
+      TaskRepetitionOutcome.Remembered,
+      "card_xyz" as TaskID,
+      "main",
+    );
+
+    expect(result1.dueTimestampMillis).toBe(result2.dueTimestampMillis);
+  });
+
+  test("graduation sets initial ease", () => {
+    const state: TaskComponentState = {
+      createdAtTimestampMillis: 0,
+      lastRepetitionTimestampMillis: 1000,
+      dueTimestampMillis: 2000,
+      intervalMillis: 0,
+      learningStep: 1,
+    };
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      state,
+      2000,
+      TaskRepetitionOutcome.Remembered,
+      testTaskID,
+      testComponentID,
+    );
+
+    expect(result.easeFactor).toBe(
+      config.intervalGrowthFactor + config.easeIncrement,
+    );
+  });
+
+  test("old cards without learningStep treated as graduated", () => {
+    // A card with intervalMillis > 0 and no learningStep = graduated
+    const graduatedState: TaskComponentState = {
+      createdAtTimestampMillis: 0,
+      lastRepetitionTimestampMillis: 1000,
+      dueTimestampMillis: config.initialReviewInterval * 2,
+      intervalMillis: config.initialReviewInterval * 2,
+    };
+    const result = scheduler.computeNextDueIntervalMillisForRepetition(
+      graduatedState,
+      graduatedState.dueTimestampMillis + 100000,
+      TaskRepetitionOutcome.Remembered,
+      testTaskID,
+      testComponentID,
+    );
+
+    // Should use graduated logic: interval grows, no learningStep returned
+    expect(result.intervalMillis).toBeGreaterThan(graduatedState.intervalMillis);
+    expect(result.learningStep).toBeUndefined();
   });
 });
 
@@ -419,9 +583,9 @@ describe.each([
   { outcome: TaskRepetitionOutcome.Remembered, label: "successful" },
   { outcome: TaskRepetitionOutcome.Skipped, label: "skipped" },
 ])("$label after retry", ({ outcome }) => {
-  test("not yet successful", () => {
+  test("not yet successful (enters learning step 1)", () => {
     const reviewTimestampMillis = 10000;
-    const { dueTimestampMillis, intervalMillis } =
+    const result =
       scheduler.computeNextDueIntervalMillisForRepetition(
         {
           createdAtTimestampMillis: 0,
@@ -435,15 +599,10 @@ describe.each([
         testComponentID,
       );
 
-    // After a successful initial retry, the interval should jump from 0 to the initial interval.
-    expect(intervalMillis).toEqual(
-      defaultSpacedRepetitionSchedulerConfiguration.initialReviewInterval,
-    );
-
-    // Should be within jitter.
-    expect(
-      dueTimestampMillis - (reviewTimestampMillis + intervalMillis),
-    ).toMatchInlineSnapshot(`86000`);
+    // After a successful initial retry, enters learning step 1 (10min)
+    expect(result.intervalMillis).toBe(0);
+    expect(result.learningStep).toBe(1);
+    expect(result.dueTimestampMillis).toBe(reviewTimestampMillis + 600_000);
   });
 
   test("with past success", () => {
