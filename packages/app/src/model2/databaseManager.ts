@@ -14,6 +14,7 @@ import { SupabaseSyncAdapter } from "../sync/supabaseSyncAdapter.js";
 import { createOrbitStore } from "./orbitStoreFactory.js";
 
 const LAST_SYNC_KEY = "supabase_last_sync_at";
+const BUILD_VERSION = "2026-02-26a";
 
 export class DatabaseManager {
   private readonly _storePromise: Promise<OrbitStore>;
@@ -145,13 +146,13 @@ export class DatabaseManager {
       ]);
       const cursor = lastSyncAt.get(LAST_SYNC_KEY) ?? null;
 
-      console.info("[Sync] Pulling events since:", cursor ?? "beginning");
+      console.info(`[Sync][${BUILD_VERSION}] Pulling events since:`, cursor ?? "beginning");
       const { events, latestCreatedAt } =
         await this._syncAdapter.pullEvents(cursor);
 
       if (events.length > 0) {
         await store.database.putEvents(events);
-        console.info(`[Sync] Pulled ${events.length} events.`);
+        console.info(`[Sync][${BUILD_VERSION}] Pulled ${events.length} events.`);
       }
 
       if (latestCreatedAt) {
@@ -162,7 +163,7 @@ export class DatabaseManager {
     } catch (error) {
       // Pull failure is non-fatal: we proceed with local data.
       // No retry for MVP — next app load will attempt again.
-      console.error("[Sync] Pull failed:", error);
+      console.error(`[Sync][${BUILD_VERSION}] Pull failed:`, error);
     }
   }
 }
