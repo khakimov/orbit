@@ -3,7 +3,6 @@ import {
   EventForEntity,
   EventType,
   generateUniqueID,
-  getReviewQueueFuzzyDueTimestampThreshold,
   ReviewItem,
   Task,
   TaskID,
@@ -443,9 +442,10 @@ export default function ReviewSession({ userId }: { userId: string }) {
 }
 
 function itemIsStillDue(item: ReviewItem): boolean {
-  const nowDueThreshold = getReviewQueueFuzzyDueTimestampThreshold();
+  // Strict "due now" check for same-session retries.
+  // The 16-hour fuzzy lookahead is for initial queue fetch only —
+  // learning steps (1min, 10min) must not be short-circuited by retry.
   return (
-    item.task.componentStates[item.componentID].dueTimestampMillis <=
-    nowDueThreshold
+    item.task.componentStates[item.componentID].dueTimestampMillis <= Date.now()
   );
 }
