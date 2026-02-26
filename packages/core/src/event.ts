@@ -10,6 +10,7 @@ export type Event =
   | TaskIngestEvent
   | TaskRepetitionEvent
   | TaskRescheduleEvent
+  | TaskResetComponentEvent
   | TaskUpdateDeletedEvent
   | TaskUpdateSpecEvent
   | TaskUpdateProvenanceEvent
@@ -20,6 +21,7 @@ export enum EventType {
   TaskIngest = "taskIngest",
   TaskRepetition = "taskRepetition",
   TaskReschedule = "taskReschedule",
+  TaskResetComponent = "taskResetComponent",
   TaskUpdateDeleted = "taskUpdatedDeleted",
   TaskUpdateSpecEvent = "taskUpdateSpec",
   TaskUpdateProvenanceEvent = "taskUpdateProvenanceEvent",
@@ -76,6 +78,11 @@ export interface TaskRescheduleEvent
   extends EventBase<EventType.TaskReschedule, Task> {
   componentID: string;
   newDueTimestampMillis: number;
+}
+
+export interface TaskResetComponentEvent
+  extends EventBase<EventType.TaskResetComponent, Task> {
+  componentID: string;
 }
 
 export interface TaskUpdateDeletedEvent

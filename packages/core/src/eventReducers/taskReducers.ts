@@ -10,6 +10,7 @@ import {
   TaskIngestEvent,
   TaskRepetitionEvent,
   TaskRescheduleEvent,
+  TaskResetComponentEvent,
   TaskUpdateDeletedEvent,
   TaskUpdateMetadataEvent,
   TaskUpdateProvenanceEvent,
@@ -95,6 +96,24 @@ export function taskRescheduleEventReducer(
     (oldState) => ({
       ...oldState,
       dueTimestampMillis: event.newDueTimestampMillis,
+    }),
+  );
+}
+
+export function taskResetComponentEventReducer(
+  oldSnapshot: Task | null,
+  event: TaskResetComponentEvent,
+): Task {
+  assertTaskExists(oldSnapshot, event.type);
+  return modifyTaskComponent(
+    oldSnapshot,
+    event.componentID,
+    event.id,
+    () => ({
+      createdAtTimestampMillis: event.timestampMillis,
+      lastRepetitionTimestampMillis: null,
+      dueTimestampMillis: event.timestampMillis,
+      intervalMillis: 0,
     }),
   );
 }

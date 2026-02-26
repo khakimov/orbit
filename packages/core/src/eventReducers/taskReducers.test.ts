@@ -8,6 +8,7 @@ import {
   EventType,
   TaskRepetitionEvent,
   TaskRepetitionOutcome,
+  TaskResetComponentEvent,
   TaskRescheduleEvent,
   TaskUpdateDeletedEvent,
   TaskUpdateMetadataEvent,
@@ -242,5 +243,30 @@ describe("updateMetadata reducer", () => {
     const task1 = eventReducer(testClozeTask, testEvent);
     const task2 = eventReducer(task1, secondUpdateEvent);
     expect(task2.metadata).toEqual({ a: "a", b: "b'", c: "c" });
+  });
+});
+
+describe("resetComponent reducer", () => {
+  const testEvent: TaskResetComponentEvent = {
+    id: "reset1" as EventID,
+    type: EventType.TaskResetComponent,
+    entityID: testIngestClozeTaskEvent.entityID,
+    timestampMillis: 5000,
+    componentID: testTaskFirstComponentID,
+  };
+
+  test("fails without a base state", () => {
+    expect(() => eventReducer(null, testEvent)).toThrow();
+  });
+
+  test("resets component to brand-new state", () => {
+    const task = eventReducer(testClozeTask, testEvent);
+    const state = task.componentStates[testTaskFirstComponentID];
+    expect(state.createdAtTimestampMillis).toBe(5000);
+    expect(state.lastRepetitionTimestampMillis).toBeNull();
+    expect(state.dueTimestampMillis).toBe(5000);
+    expect(state.intervalMillis).toBe(0);
+    expect(state.easeFactor).toBeUndefined();
+    expect(state.learningStep).toBeUndefined();
   });
 });
