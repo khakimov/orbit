@@ -4,6 +4,9 @@ project_id = "iqmoaqphafuvotwmtycb"
 enabled = true
 port = 54321
 
+[functions.generate-cards]
+verify_jwt = false
+
 [functions.review-card]
 verify_jwt = false
 

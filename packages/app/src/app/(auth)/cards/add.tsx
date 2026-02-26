@@ -120,7 +120,10 @@ export default function AddCardPage() {
   const [sourceTitle, setSourceTitle] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourcePinned, setSourcePinned] = useState(false);
-  
+  const [generatedCards, setGeneratedCards] = useState<Array<{ id: string; question: string; answer: string }>>([]);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Load pinned context from localStorage on mount
@@ -218,6 +221,77 @@ export default function AddCardPage() {
     } finally {
       setReviewing(false);
     }
+  }
+
+  const canGenerate = useMemo(
+    () => context.trim().length > 0,
+    [context],
+  );
+
+  async function handleGenerate() {
+    if (!canGenerate) return;
+    setGenerating(true);
+    setGeneratedCards([]);
+    setGenerateError(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-cards", {
+        body: {
+          context: context.trim(),
+          sourceTitle: sourceTitle.trim() || undefined,
+          sourceUrl: sourceUrl.trim() || undefined,
+        },
+      });
+
+      if (error) {
+        setGenerateError(error.message ?? "Generation failed");
+        return;
+      }
+
+      const cards = (data as { cards: Array<{ question: string; answer: string }> }).cards;
+      if (!Array.isArray(cards) || cards.length === 0) {
+        setGenerateError("No cards generated");
+        return;
+      }
+      setGeneratedCards(cards.map((c, i) => ({ ...c, id: `gen-${Date.now()}-${i}` })));
+    } catch (err) {
+      console.error("Generate error:", err);
+      setGenerateError("Generation request failed");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleAddGeneratedCard(index: number) {
+    if (!databaseManager) return;
+    const card = generatedCards[index];
+    if (!card) return;
+
+    const taskIngestEvent: TaskIngestEvent = {
+      id: generateUniqueID(),
+      type: EventType.TaskIngest as const,
+      entityID: generateUniqueID<TaskID>(),
+      timestampMillis: Date.now(),
+      spec: {
+        type: TaskSpecType.Memory as const,
+        content: {
+          type: TaskContentType.QA as const,
+          body: { text: card.question, attachments: [] as AttachmentID[] },
+          answer: { text: card.answer, attachments: [] as AttachmentID[] },
+        },
+      },
+      provenance: sourceTitle.trim() || sourceUrl.trim()
+        ? {
+            identifier: sourceUrl.trim() || `source:${sourceTitle.trim().toLowerCase().replace(/\s+/g, "-")}`,
+            ...(sourceUrl.trim() ? { url: sourceUrl.trim() } : {}),
+            ...(sourceTitle.trim() ? { title: sourceTitle.trim() } : {}),
+          }
+        : null,
+    };
+
+    await databaseManager.recordEvents([taskIngestEvent]);
+    setGeneratedCards((prev) => prev.filter((_, i) => i !== index));
+    showToast("Added!");
   }
 
   async function handleSave() {
@@ -650,6 +724,52 @@ export default function AddCardPage() {
                 hasReview={!!review}
               />
 
+              {/* Generate cards from context */}
+              {!editId && (
+                <View style={{ marginTop: gridUnit * 2 }}>
+                  <NavButton
+                    label={generating ? "Generating..." : "Generate Cards"}
+                    onPress={handleGenerate}
+                    disabled={!canGenerate || generating}
+                  />
+                  {generateError && (
+                    <Text style={[styles.type.runningTextSmall.typeStyle, { color: "#dc2626", marginTop: gridUnit }]}>
+                      {generateError}
+                    </Text>
+                  )}
+                  {generatedCards.map((card, i) => (
+                    <View
+                      key={card.id}
+                      style={{
+                        marginTop: gridUnit,
+                        padding: gridUnit * 2,
+                        borderRadius,
+                        backgroundColor: neutral.card,
+                        borderWidth: 1,
+                        borderColor: neutral.border,
+                        flexDirection: "row",
+                        alignItems: "flex-start",
+                        gap: gridUnit,
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.type.runningTextSmall.typeStyle, { color: neutral.text }]}>
+                          Q: {card.question}
+                        </Text>
+                        <Text style={[styles.type.runningTextSmall.typeStyle, { color: neutral.textSoft, marginTop: gridUnit / 2 }]}>
+                          A: {card.answer}
+                        </Text>
+                      </View>
+                      <NavButton
+                        label="Add"
+                        onPress={() => handleAddGeneratedCard(i)}
+                        disabled={!databaseManager}
+                      />
+                    </View>
+                  ))}
+                </View>
+              )}
+
               {/* AI Review results */}
               {reviewError && (
                 <View style={{ marginTop: gridUnit * 2 }}>
@@ -885,6 +1005,51 @@ export default function AddCardPage() {
               isWide={false}
               scrollViewRef={scrollViewRef}
             />
+            {/* Mobile: Generate cards from context */}
+            {!editId && (
+              <View style={{ marginTop: gridUnit * 2 }}>
+                <NavButton
+                  label={generating ? "Generating..." : "Generate Cards"}
+                  onPress={handleGenerate}
+                  disabled={!canGenerate || generating}
+                />
+                {generateError && (
+                  <Text style={[styles.type.runningTextSmall.typeStyle, { color: "#dc2626", marginTop: gridUnit }]}>
+                    {generateError}
+                  </Text>
+                )}
+                {generatedCards.map((card, i) => (
+                  <View
+                    key={card.id}
+                    style={{
+                      marginTop: gridUnit,
+                      padding: gridUnit * 2,
+                      borderRadius,
+                      backgroundColor: neutral.card,
+                      borderWidth: 1,
+                      borderColor: neutral.border,
+                      flexDirection: "row",
+                      alignItems: "flex-start",
+                      gap: gridUnit,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.type.runningTextSmall.typeStyle, { color: neutral.text }]}>
+                        Q: {card.question}
+                      </Text>
+                      <Text style={[styles.type.runningTextSmall.typeStyle, { color: neutral.textSoft, marginTop: gridUnit / 2 }]}>
+                        A: {card.answer}
+                      </Text>
+                    </View>
+                    <NavButton
+                      label="Add"
+                      onPress={() => handleAddGeneratedCard(i)}
+                      disabled={!databaseManager}
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
             </>
           )}
 
