@@ -269,4 +269,14 @@ describe("resetComponent reducer", () => {
     expect(state.easeFactor).toBeUndefined();
     expect(state.learningStep).toBeUndefined();
   });
+
+  test("only resets specified component", () => {
+    const task = eventReducer(testClozeTask, testEvent);
+    const otherComponentID = Object.keys(testClozeTask.componentStates).find(
+      (id) => id !== testTaskFirstComponentID,
+    )!;
+    expect(task.componentStates[otherComponentID]).toEqual(
+      testClozeTask.componentStates[otherComponentID],
+    );
+  });
 });

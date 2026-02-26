@@ -421,6 +421,39 @@
             ],
             "type": "string"
         },
+        "TaskResetComponentEvent": {
+            "additionalProperties": false,
+            "properties": {
+                "componentID": {
+                    "type": "string"
+                },
+                "entityID": {
+                    "pattern": "^[0-9a-zA-Z_\\-]{22}$",
+                    "type": "string"
+                },
+                "id": {
+                    "pattern": "^[0-9a-zA-Z_\\-]{22}$",
+                    "type": "string"
+                },
+                "timestampMillis": {
+                    "type": "number"
+                },
+                "type": {
+                    "enum": [
+                        "taskResetComponent"
+                    ],
+                    "type": "string"
+                }
+            },
+            "required": [
+                "componentID",
+                "entityID",
+                "id",
+                "timestampMillis",
+                "type"
+            ],
+            "type": "object"
+        },
         "TaskRescheduleEvent": {
             "additionalProperties": false,
             "properties": {
@@ -640,6 +673,9 @@
             },
             {
                 "$ref": "#/definitions/TaskRescheduleEvent"
+            },
+            {
+                "$ref": "#/definitions/TaskResetComponentEvent"
             },
             {
                 "$ref": "#/definitions/TaskUpdateDeletedEvent"

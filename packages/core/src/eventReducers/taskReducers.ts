@@ -114,6 +114,8 @@ export function taskResetComponentEventReducer(
       lastRepetitionTimestampMillis: null,
       dueTimestampMillis: event.timestampMillis,
       intervalMillis: 0,
+      easeFactor: undefined,
+      learningStep: undefined,
     }),
   );
 }
