@@ -8,7 +8,7 @@ import {
   Task,
 } from "@withorbit/core";
 import { ReviewAreaItem } from "@withorbit/ui";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export interface ReviewSessionManagerState {
   reviewAreaQueue: ReviewAreaItem[];
@@ -218,6 +218,89 @@ function reviewSessionManagerPushReviewAreaQueueItems(
   }
 }
 
+function reviewSessionManagerIsQueueExhausted(
+  state: ReviewSessionManagerState,
+): boolean {
+  return (
+    state.currentReviewAreaQueueIndex === null ||
+    state.currentReviewAreaQueueIndex >= state.reviewAreaQueue.length
+  );
+}
+
+function findReviewAreaQueueItemForSessionItem(
+  state: ReviewSessionManagerState,
+  reviewItem: ReviewItem,
+): ReviewAreaItem | null {
+  const queueItemIndex = state.reviewAreaQueue.findLastIndex(
+    (queueItem) =>
+      queueItem.taskID === reviewItem.task.id &&
+      queueItem.componentID === reviewItem.componentID,
+  );
+  return queueItemIndex === -1 ? null : state.reviewAreaQueue[queueItemIndex];
+}
+
+function reviewSessionManagerGetRetryQueueItemsDueNow(
+  state: ReviewSessionManagerState,
+  now: number = Date.now(),
+): ReviewAreaItem[] {
+  if (!reviewSessionManagerIsQueueExhausted(state)) {
+    return [];
+  }
+
+  return state.sessionItems.flatMap((reviewItem) => {
+    const dueTimestampMillis =
+      reviewItem.task.componentStates[reviewItem.componentID].dueTimestampMillis;
+    if (dueTimestampMillis > now) {
+      return [];
+    }
+
+    const queueItem = findReviewAreaQueueItemForSessionItem(state, reviewItem);
+    if (!queueItem) {
+      console.error(
+        "Cannot enqueue retry item because it has no matching review area queue item",
+        reviewItem.task.id,
+        reviewItem.componentID,
+      );
+      return [];
+    }
+    return [queueItem];
+  });
+}
+
+function reviewSessionManagerRefillRetryItemsIfNeeded(
+  state: ReviewSessionManagerState,
+): ReviewSessionManagerState {
+  const retryQueueItems = reviewSessionManagerGetRetryQueueItemsDueNow(state);
+  if (retryQueueItems.length === 0) {
+    return state;
+  }
+  return reviewSessionManagerPushReviewAreaQueueItems(state, retryQueueItems);
+}
+
+function reviewSessionManagerGetSoonestFutureRetryDueTimestampMillis(
+  state: ReviewSessionManagerState,
+  now: number = Date.now(),
+): number | null {
+  if (!reviewSessionManagerIsQueueExhausted(state)) {
+    return null;
+  }
+
+  let soonestFutureDueTimestampMillis = Infinity;
+  for (const reviewItem of state.sessionItems) {
+    const dueTimestampMillis =
+      reviewItem.task.componentStates[reviewItem.componentID].dueTimestampMillis;
+    if (
+      dueTimestampMillis > now &&
+      dueTimestampMillis < soonestFutureDueTimestampMillis
+    ) {
+      soonestFutureDueTimestampMillis = dueTimestampMillis;
+    }
+  }
+  return soonestFutureDueTimestampMillis === Infinity
+    ? null
+    : soonestFutureDueTimestampMillis;
+}
+
 function reviewSessionManagerJumpToItem(
   state: ReviewSessionManagerState,
   sessionItemIndex: number,
@@ -310,7 +393,11 @@ export function useReviewSessionManager(): ReviewSessionManagerActions &
   const reviewSessionManagerActions: ReviewSessionManagerActions = useMemo(
     () => ({
       markCurrentItem: (events, continuation) => {
-        setState((state) => reviewSessionManagerMarkCurrentItem(state, events));
+        setState((state) =>
+          reviewSessionManagerRefillRetryItemsIfNeeded(
+            reviewSessionManagerMarkCurrentItem(state, events),
+          ),
+        );
         // This is a pretty heinous abuse. Clients need to access the new state, so we invoke the reducer again but return its input (making it a no-op) to call the continuation with the correct context.
         if (continuation) {
           setState((newState) => {
@@ -352,6 +439,22 @@ export function useReviewSessionManager(): ReviewSessionManagerActions &
     }),
     [],
   );
+
+  useEffect(() => {
+    const now = Date.now();
+    const soonestFutureDueTimestampMillis =
+      reviewSessionManagerGetSoonestFutureRetryDueTimestampMillis(state, now);
+    if (soonestFutureDueTimestampMillis === null) {
+      return;
+    }
+
+    const delayMillis = Math.max(0, soonestFutureDueTimestampMillis - now);
+    const timer = setTimeout(() => {
+      setState((state) => reviewSessionManagerRefillRetryItemsIfNeeded(state));
+    }, delayMillis);
+
+    return () => clearTimeout(timer);
+  }, [state]);
 
   return { ...reviewSessionManagerActions, ...state };
 }

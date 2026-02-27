@@ -256,21 +256,7 @@ export default function ReviewSession({ userId }: { userId: string }) {
       reviewSessionStartTimestampMillis:
         reviewSessionStartTimestampMillis.current,
     });
-    reviewSessionManager.markCurrentItem(events, (newState) => {
-      // Refill queue with items to retry if we're at the end.
-      if (
-        newState.currentReviewAreaQueueIndex !== null &&
-        newState.currentReviewAreaQueueIndex >= newState.reviewAreaQueue.length
-      ) {
-        const itemsToRetry = newState.sessionItems.filter(itemIsStillDue);
-        if (itemsToRetry.length > 0) {
-          console.log("Pushing items to retry", itemsToRetry);
-          reviewSessionManager.pushReviewAreaQueueItems(
-            getReviewAreaItemsFromReviewItems(itemsToRetry),
-          );
-        }
-      }
-    });
+    reviewSessionManager.markCurrentItem(events);
   }
 
   function onDelete() {
