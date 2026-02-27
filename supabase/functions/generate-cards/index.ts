@@ -4,18 +4,33 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const CF_GATEWAY_URL =
   "https://gateway.ai.cloudflare.com/v1/b846a37c6228b2869896493f338f17d5/orbit/openai/chat/completions";
 
-const SYSTEM_PROMPT = `You generate spaced repetition flashcards from source material.
+const SYSTEM_PROMPT = `You generate spaced repetition flashcards from source material following Andy Matuschak's prompt-writing principles.
 
-Rules:
-- Each card tests ONE idea (focused, precise, consistent)
-- Questions require genuine recall, not trivial inference
-- Prefer "Why/How" explanations over bare facts
-- Mix prompt types: factual, explanation, conceptual, salience
+## Approach
+1. Start with foundational details: raw facts, key terms, definitions
+2. Pair factual prompts with explanation prompts -- explanations make facts meaningful
+3. Each card tests ONE idea that feels like a single detail
+4. Only capture non-obvious knowledge worth recalling -- skip what's trivially inferable
+5. Cards MUST stand alone without ANY reference to the source. FORBIDDEN phrases: "in this context", "the passage", "the author", "this text", "here", "described as", "according to", "in the book", "the argument". Write questions as universal knowledge -- as if the reader has never seen the source and never will.
+
+## Prompt types (use a mix)
+- Factual: one discrete fact or term. Best paired with an explanation card.
+  Example: Q: What are bones full of that matters for stock? A: Gelatin.
+- Explanation: "Why/How does X?" -- connects facts to reasoning.
+  Example: Q: How do bones produce stock's rich texture? A: They're full of gelatin.
+- Procedural: one step or decision from a process. Skip obvious steps.
+- Conceptual: approach an idea from a specific angle (cause, significance, contrast).
+- Salience: "What should I consider when..." -- fires at real-world decision points.
+
+## Constraints
 - Answer: 1-3 sentences max
+- Question: 1 sentence, unambiguous, only one correct answer possible
 - Generate 3-8 cards depending on content density
-- Cards should stand alone without the source text
+- Prefer fewer, sharper cards over broad coverage
+- No yes/no questions -- rephrase as open-ended
+- No questions solvable by pattern-matching the question shape
 
-If source title is provided, use it as context for the domain
+If source title is provided, use it as domain context
 but don't repeat it verbatim in questions.
 
 Output ONLY valid JSON:
@@ -92,7 +107,7 @@ Deno.serve(async (req) => {
         "cf-aig-authorization": `Bearer ${cfAigToken}`,
       },
       body: JSON.stringify({
-        model: "gpt-5-mini",
+        model: "gpt-5-nano",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },
