@@ -449,8 +449,14 @@ export function useReviewSessionManager(): ReviewSessionManagerActions &
     }
 
     const delayMillis = Math.max(0, soonestFutureDueTimestampMillis - now);
+    console.log("[ReviewSession] Scheduling retry check in", Math.round(delayMillis / 1000), "seconds");
     const timer = setTimeout(() => {
-      setState((state) => reviewSessionManagerRefillRetryItemsIfNeeded(state));
+      console.log("[ReviewSession] Timer fired, checking for due items");
+      setState((state) => {
+        const newState = reviewSessionManagerRefillRetryItemsIfNeeded(state);
+        console.log("[ReviewSession] Refill changed state:", newState !== state);
+        return newState;
+      });
     }, delayMillis);
 
     return () => clearTimeout(timer);
