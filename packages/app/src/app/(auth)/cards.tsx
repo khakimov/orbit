@@ -1,6 +1,9 @@
 import {
+  AttachmentID,
+  AttachmentMIMEType,
   EventType,
   generateUniqueID,
+  isAudioMIMEType,
   QATaskContent,
   Task,
   TaskContentType,
@@ -10,7 +13,7 @@ import {
 import { styles } from "@withorbit/ui";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useAuthenticationClient, useCurrentUserRecord } from "../../authentication/authContext.js";
 import { neutral, NavButton } from "../../components/PageShared.js";
 import { useDatabaseManager } from "../../hooks/useDatabaseManager.js";
@@ -25,12 +28,57 @@ function formatDate(ms: number): string {
   });
 }
 
+function InlineAudioButton({ url }: { url: string }) {
+  const [playing, setPlaying] = useState(false);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const toggle = useCallback(() => {
+    if (Platform.OS !== "web") return;
+    if (playing && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+      setPlaying(false);
+    } else {
+      const audio = new Audio(url);
+      audio.onended = () => { audioRef.current = null; setPlaying(false); };
+      audio.onerror = () => { audioRef.current = null; setPlaying(false); };
+      audioRef.current = audio;
+      audio.play();
+      setPlaying(true);
+    }
+  }, [playing, url]);
+
+  useEffect(() => {
+    return () => { audioRef.current?.pause(); audioRef.current = null; };
+  }, []);
+
+  return (
+    <Pressable
+      onPress={toggle}
+      style={{
+        paddingHorizontal: gridUnit,
+        paddingVertical: gridUnit / 2,
+        backgroundColor: "rgba(0,0,0,0.08)",
+        borderRadius: borderRadius / 2,
+        alignSelf: "flex-start",
+      }}
+    >
+      <Text style={[styles.type.labelTiny.typeStyle, { color: neutral.text }]}>
+        {playing ? "\u25A0 Stop" : "\u25B6 Play"}
+      </Text>
+    </Pressable>
+  );
+}
+
 function CardRow({
   task,
+  audioURL,
   onEdit,
   onDelete,
 }: {
   task: Task;
+  audioURL: string | null;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -71,6 +119,11 @@ function CardRow({
       >
         {answer}
       </Text>
+      {audioURL && (
+        <View style={{ marginTop: gridUnit }}>
+          <InlineAudioButton url={audioURL} />
+        </View>
+      )}
       <View style={{ height: gridUnit }} />
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <Text style={[styles.type.labelTiny.typeStyle, { color: neutral.textSoft }]}>
@@ -106,6 +159,8 @@ export default function CardsPage() {
   const userRecord = useCurrentUserRecord(authClient);
   const databaseManager = useDatabaseManager(userRecord?.userID ?? null);
 
+  const [audioURLs, setAudioURLs] = useState<Record<string, string>>({});
+
   const loadCards = useCallback(() => {
     databaseManager?.listAllCards().then(setCards);
   }, [databaseManager]);
@@ -113,6 +168,26 @@ export default function CardsPage() {
   useEffect(() => {
     loadCards();
   }, [loadCards]);
+
+  // Resolve audio attachment URLs for cards that have them
+  useEffect(() => {
+    if (!cards || !databaseManager) return;
+    const pending: Promise<void>[] = [];
+    for (const task of cards) {
+      const content = task.spec.content;
+      if (content.type !== TaskContentType.QA) continue;
+      const qa = content as QATaskContent;
+      for (const id of qa.body.attachments) {
+        pending.push(
+          databaseManager.getURLForAttachmentID(id as AttachmentID).then((result) => {
+            if (result && isAudioMIMEType(result.mimeType)) {
+              setAudioURLs((prev) => ({ ...prev, [task.id]: result.url }));
+            }
+          }),
+        );
+      }
+    }
+  }, [cards, databaseManager]);
 
   async function handleDelete(taskId: TaskID) {
     if (!databaseManager) return;
@@ -217,6 +292,7 @@ export default function CardsPage() {
               <CardRow
                 key={task.id}
                 task={task}
+                audioURL={audioURLs[task.id] ?? null}
                 onEdit={() => handleEdit(task)}
                 onDelete={() => handleDelete(task.id as TaskID)}
               />
