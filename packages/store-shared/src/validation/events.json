@@ -36,6 +36,7 @@
         },
         "AttachmentMIMEType": {
             "enum": [
+                "audio/mpeg",
                 "image/jpeg",
                 "image/png",
                 "image/svg+xml"
