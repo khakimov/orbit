@@ -209,10 +209,20 @@ export default function AddCardPage() {
         showToast("Unsupported audio type. Use MP3.", 3000);
         return;
       }
+      if (audio) URL.revokeObjectURL(audio.uri);
       setAudio({ uri: URL.createObjectURL(file), mimeType: mime, side: "a" });
     };
     input.click();
   }
+
+  // Revoke object URL when audio is removed
+  const prevAudioUri = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevAudioUri.current && prevAudioUri.current !== audio?.uri) {
+      URL.revokeObjectURL(prevAudioUri.current);
+    }
+    prevAudioUri.current = audio?.uri ?? null;
+  }, [audio?.uri]);
 
   const canReview = useMemo(
     () => question.trim().length > 0 && answer.trim().length > 0,
@@ -577,12 +587,16 @@ export default function AddCardPage() {
                     <Pressable
                       onPress={() => setImage({ ...image, side: "q" })}
                       style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: image.side === "q" ? neutral.text : "transparent" }}
+                      accessibilityLabel="Place on question side"
+                      accessibilityState={{ selected: image.side === "q" }}
                     >
                       <Text style={{ fontSize: 11, fontWeight: "600", color: image.side === "q" ? "#fff" : neutral.textSoft }}>Q</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => setImage({ ...image, side: "a" })}
                       style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: image.side === "a" ? neutral.text : "transparent" }}
+                      accessibilityLabel="Place on answer side"
+                      accessibilityState={{ selected: image.side === "a" }}
                     >
                       <Text style={{ fontSize: 11, fontWeight: "600", color: image.side === "a" ? "#fff" : neutral.textSoft }}>A</Text>
                     </Pressable>
@@ -613,12 +627,16 @@ export default function AddCardPage() {
                     <Pressable
                       onPress={() => setAudio({ ...audio, side: "q" })}
                       style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: audio.side === "q" ? neutral.text : "transparent" }}
+                      accessibilityLabel="Place on question side"
+                      accessibilityState={{ selected: audio.side === "q" }}
                     >
                       <Text style={{ fontSize: 11, fontWeight: "600", color: audio.side === "q" ? "#fff" : neutral.textSoft }}>Q</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => setAudio({ ...audio, side: "a" })}
                       style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: audio.side === "a" ? neutral.text : "transparent" }}
+                      accessibilityLabel="Place on answer side"
+                      accessibilityState={{ selected: audio.side === "a" }}
                     >
                       <Text style={{ fontSize: 11, fontWeight: "600", color: audio.side === "a" ? "#fff" : neutral.textSoft }}>A</Text>
                     </Pressable>
