@@ -562,10 +562,7 @@ export default function AddCardPage() {
               <NavButton label="Attach Image" onPress={handlePickImage} />
               <NavButton label="Attach Audio" onPress={handlePickAudio} />
               {image && (
-                <Pressable
-                  onPress={() => setImage({ ...image, side: image.side === "q" ? "a" : "q" })}
-                  style={{ position: "relative", flexDirection: "row", alignItems: "center", gap: 4 }}
-                >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <Image
                     source={{ uri: image.uri }}
                     style={{
@@ -576,15 +573,23 @@ export default function AddCardPage() {
                       borderColor: neutral.border,
                     }}
                   />
-                  <Text style={{ color: neutral.textSoft, fontSize: 12 }}>
-                    ({image.side === "q" ? "Q" : "A"})
-                  </Text>
+                  <View style={{ flexDirection: "row", borderRadius: 4, borderWidth: 1, borderColor: neutral.border, overflow: "hidden" }}>
+                    <Pressable
+                      onPress={() => setImage({ ...image, side: "q" })}
+                      style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: image.side === "q" ? neutral.text : "transparent" }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: image.side === "q" ? "#fff" : neutral.textSoft }}>Q</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setImage({ ...image, side: "a" })}
+                      style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: image.side === "a" ? neutral.text : "transparent" }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: image.side === "a" ? "#fff" : neutral.textSoft }}>A</Text>
+                    </Pressable>
+                  </View>
                   <Pressable
-                    onPress={(e) => { e.stopPropagation(); setImage(null); }}
+                    onPress={() => setImage(null)}
                     style={{
-                      position: "absolute",
-                      top: -6,
-                      right: -6,
                       width: 20,
                       height: 20,
                       borderRadius: 10,
@@ -597,22 +602,30 @@ export default function AddCardPage() {
                       {"\u00D7"}
                     </Text>
                   </Pressable>
-                </Pressable>
+                </View>
               )}
               {audio && (
-                <Pressable
-                  onPress={() => setAudio({ ...audio, side: audio.side === "q" ? "a" : "q" })}
-                  style={{ position: "relative", justifyContent: "center" }}
-                >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <Text style={{ color: neutral.text, fontSize: 13 }}>
-                    {"\u266B"} MP3 ({audio.side === "q" ? "Q" : "A"})
+                    {"\u266B"} MP3
                   </Text>
+                  <View style={{ flexDirection: "row", borderRadius: 4, borderWidth: 1, borderColor: neutral.border, overflow: "hidden" }}>
+                    <Pressable
+                      onPress={() => setAudio({ ...audio, side: "q" })}
+                      style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: audio.side === "q" ? neutral.text : "transparent" }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: audio.side === "q" ? "#fff" : neutral.textSoft }}>Q</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setAudio({ ...audio, side: "a" })}
+                      style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: audio.side === "a" ? neutral.text : "transparent" }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: audio.side === "a" ? "#fff" : neutral.textSoft }}>A</Text>
+                    </Pressable>
+                  </View>
                   <Pressable
-                    onPress={(e) => { e.stopPropagation(); setAudio(null); }}
+                    onPress={() => setAudio(null)}
                     style={{
-                      position: "absolute",
-                      top: -6,
-                      right: -6,
                       width: 20,
                       height: 20,
                       borderRadius: 10,
@@ -625,7 +638,7 @@ export default function AddCardPage() {
                       {"\u00D7"}
                     </Text>
                   </Pressable>
-                </Pressable>
+                </View>
               )}
             </View>
 
