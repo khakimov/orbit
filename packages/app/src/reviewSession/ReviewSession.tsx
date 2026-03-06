@@ -10,6 +10,7 @@ import {
   TaskRepetitionOutcome,
 } from "@withorbit/core";
 import {
+  AttachmentResolverProvider,
   Button,
   IconName,
   Menu,
@@ -388,14 +389,14 @@ export default function ReviewSession({ userId }: { userId: string }) {
                   />
                 </View>
               </View>
+              <AttachmentResolverProvider
+                value={(id) => databaseManager.getURLForAttachmentID(id)}
+              >
               <ReviewArea
                 items={reviewAreaQueue}
                 currentItemIndex={currentReviewAreaQueueIndex}
                 onMark={(markingRecord) => onMark(markingRecord)}
                 onPendingOutcomeChange={setPendingOutcome}
-                getURLForAttachmentID={(id) =>
-                  databaseManager.getURLForAttachmentID(id)
-                }
                 insetBottom={
                   // So long as the container isn't tall enough to be centered, we consume the bottom insets in the button bar's padding, extending the background down through the safe area.
                   containerSize.height === styles.layout.maximumContentHeight
@@ -404,6 +405,7 @@ export default function ReviewSession({ userId }: { userId: string }) {
                 }
                 sizeClass={styles.layout.getWidthSizeClass(containerSize.width)}
               />
+              </AttachmentResolverProvider>
             </>
           );
         } else {

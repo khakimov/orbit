@@ -1,15 +1,16 @@
 import { boolean, number, text, withKnobs } from "@storybook/addon-knobs";
+import { AttachmentMIMEType } from "@withorbit/core";
 import React, { useCallback, useMemo, useState } from "react";
 import { Animated, Easing, View } from "react-native";
 import { ReviewAreaItem } from "../reviewAreaItem.js";
 import { colors } from "../styles/index.js";
 import { getWidthSizeClass } from "../styles/layout.js";
+import { AttachmentResolverProvider } from "./AttachmentResolverContext.js";
 import { generateReviewItem } from "./__fixtures__/generateReviewItem.js";
 import DebugGrid from "./DebugGrid.js";
 import useLayout from "./hooks/useLayout.js";
 import { useTransitioningColorValue } from "./hooks/useTransitioningValue.js";
 import ReviewArea from "./ReviewArea.jsx";
-import { AttachmentID } from "@withorbit/core";
 
 // noinspection JSUnusedGlobalSymbols
 export default {
@@ -23,15 +24,16 @@ type ReviewAreaTemplateProps = {
   questionOverrideText: string;
   answerOverrideText: string;
   sourceContext: string;
-  getURLForAttachmentID: (id: AttachmentID) => Promise<string | null>;
 };
+
+const noopResolver = async () =>
+  ({ url: "", mimeType: AttachmentMIMEType.PNG }) as const;
 
 function ReviewAreaTemplate({
   colorKnobOffset,
   questionOverrideText,
   answerOverrideText,
   sourceContext,
-  getURLForAttachmentID,
 }: ReviewAreaTemplateProps) {
   const items = useMemo<ReviewAreaItem[]>(
     () =>
@@ -68,32 +70,35 @@ function ReviewAreaTemplate({
   const { width, onLayout } = useLayout();
 
   return (
-    <Animated.View
-      style={{
-        backgroundColor,
-        height: 1000,
-      }}
-      onLayout={onLayout}
-    >
-      <View style={{ flex: 1 }}>
-        {boolean("Show debug grid", false) && <DebugGrid />}
-        <ReviewArea
-          items={items}
-          sizeClass={getWidthSizeClass(width)}
-          insetBottom={number("Bottom safe inset", 0)}
-          onPendingOutcomeChange={useCallback(() => {
-            return;
-          }, [])}
-          getURLForAttachmentID={getURLForAttachmentID}
-          onMark={useCallback(
-            () =>
-              setCurrentItemIndex((currentItemIndex) => currentItemIndex + 1),
-            [],
-          )}
-          currentItemIndex={currentItemIndex}
-        />
-      </View>
-    </Animated.View>
+    <AttachmentResolverProvider value={noopResolver}>
+      <Animated.View
+        style={{
+          backgroundColor,
+          height: 1000,
+        }}
+        onLayout={onLayout}
+      >
+        <View style={{ flex: 1 }}>
+          {boolean("Show debug grid", false) && <DebugGrid />}
+          <ReviewArea
+            items={items}
+            sizeClass={getWidthSizeClass(width)}
+            insetBottom={number("Bottom safe inset", 0)}
+            onPendingOutcomeChange={useCallback(() => {
+              return;
+            }, [])}
+            onMark={useCallback(
+              () =>
+                setCurrentItemIndex(
+                  (currentItemIndex) => currentItemIndex + 1,
+                ),
+              [],
+            )}
+            currentItemIndex={currentItemIndex}
+          />
+        </View>
+      </Animated.View>
+    </AttachmentResolverProvider>
   );
 }
 
@@ -111,7 +116,6 @@ export function Basic() {
 
   return (
     <ReviewAreaTemplate
-      getURLForAttachmentID={useCallback(async () => "", [])}
       colorKnobOffset={colorKnobOffset}
       questionOverrideText={questionOverrideText}
       answerOverrideText={answerOverrideText}
@@ -147,7 +151,6 @@ export function OverflowingPrompt() {
 
   return (
     <ReviewAreaTemplate
-      getURLForAttachmentID={useCallback(async () => "", [])}
       colorKnobOffset={colorKnobOffset}
       questionOverrideText={questionOverrideText}
       answerOverrideText={answerOverrideText}

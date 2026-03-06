@@ -15,48 +15,63 @@ import { Button, View } from "react-native";
 import { ReviewAreaItem } from "../reviewAreaItem.js";
 import { productKeyColor } from "../styles/colors.js";
 import { colors, layout } from "../styles/index.js";
+import {
+  AttachmentResolution,
+  AttachmentResolver,
+  AttachmentResolverProvider,
+} from "./AttachmentResolverContext.js";
 import Card from "./Card.jsx";
 import DebugGrid from "./DebugGrid.js";
 
 interface CardStoryProps {
   reviewItem: ReviewAreaItem;
-  getURLForAttachmentID: (id: AttachmentID) => Promise<string | null>;
+  attachmentResolver?: AttachmentResolver;
 }
-const CardStory = ({ reviewItem, getURLForAttachmentID }: CardStoryProps) => {
+
+const noopResolver: AttachmentResolver = async () => ({
+  url: "",
+  mimeType: AttachmentMIMEType.PNG,
+});
+
+const CardStory = ({
+  reviewItem,
+  attachmentResolver = noopResolver,
+}: CardStoryProps) => {
   return (
-    <View>
-      <h2>{JSON.stringify(reviewItem)}</h2>
-      <WithReviewState
-        initialBestLevel={null}
-        initialCurrentLevel={number("initial current level", 0)}
-        reviewItem={reviewItem}
-      >
-        {(isRevealed) =>
-          [isRevealed, true].map((isRevealed, index) => {
-            return (
-              <View
-                key={index}
-                style={{
-                  width: 375 - 16,
-                  height: layout.gridUnit * (5 * 10 + 3), // 2 fixed grid units for caption and its margin; 1 for the space between question and answer; the rest for 2:3 ratio of answer:question
-                  borderWidth: 1,
-                  borderColor: "gray",
-                  margin: 16,
-                }}
-              >
-                {boolean("Show grid", true) && <DebugGrid />}
-                <Card
-                  accentColor={productKeyColor}
-                  reviewItem={reviewItem}
-                  backIsRevealed={isRevealed}
-                  getURLForAttachmentID={getURLForAttachmentID}
-                />
-              </View>
-            );
-          })
-        }
-      </WithReviewState>
-    </View>
+    <AttachmentResolverProvider value={attachmentResolver}>
+      <View>
+        <h2>{JSON.stringify(reviewItem)}</h2>
+        <WithReviewState
+          initialBestLevel={null}
+          initialCurrentLevel={number("initial current level", 0)}
+          reviewItem={reviewItem}
+        >
+          {(isRevealed) =>
+            [isRevealed, true].map((isRevealed, index) => {
+              return (
+                <View
+                  key={index}
+                  style={{
+                    width: 375 - 16,
+                    height: layout.gridUnit * (5 * 10 + 3),
+                    borderWidth: 1,
+                    borderColor: "gray",
+                    margin: 16,
+                  }}
+                >
+                  {boolean("Show grid", true) && <DebugGrid />}
+                  <Card
+                    accentColor={productKeyColor}
+                    reviewItem={reviewItem}
+                    backIsRevealed={isRevealed}
+                  />
+                </View>
+              );
+            })
+          }
+        </WithReviewState>
+      </View>
+    </AttachmentResolverProvider>
   );
 };
 
@@ -111,7 +126,6 @@ const defaultReviewAreaItem: ReviewAreaItem = {
 
 const cardTemplateArgs = {
   reviewItem: defaultReviewAreaItem,
-  getURLForAttachmentID: async () => "",
 };
 
 function makeTestQASpec(
@@ -140,6 +154,11 @@ const testAttachmentIDReference: AttachmentReference = {
   id: "testAttachmentID" as AttachmentID,
   createdAtTimestampMillis: 0,
 };
+
+const imageResolver: AttachmentResolver = async () => ({
+  url: "https://picsum.photos/id/200/539/323",
+  mimeType: AttachmentMIMEType.PNG,
+});
 
 export const Basic = {
   args: {
@@ -170,11 +189,11 @@ export const UnorderedList = {
       ...defaultReviewAreaItem,
       spec: makeTestQASpec(
         `Test with an unordered list this is a long line to start us off
-              
+
   * First item
   * Second item which is longer to show a second line.
   * Third item
-  
+
   Another paragraph`,
       ),
     },
@@ -188,11 +207,11 @@ export const OrderedList = {
       ...defaultReviewAreaItem,
       spec: makeTestQASpec(
         `Test with an ordered list this is a long line to start us off
-              
+
   1. First item
   1. Second item which is longer to show a second line.
   1. Third item
-  
+
   Another paragraph`,
       ),
     },
@@ -288,7 +307,7 @@ export const ImageQuestion = {
         },
       },
     },
-    getURLForAttachmentID: async () => "https://picsum.photos/id/200/539/323",
+    attachmentResolver: imageResolver,
   },
 } satisfies Story;
 
@@ -308,7 +327,7 @@ export const ImageAnswer = {
         },
       },
     },
-    getURLForAttachmentID: async () => "https://picsum.photos/id/200/539/323",
+    attachmentResolver: imageResolver,
   },
 } satisfies Story;
 
@@ -332,6 +351,6 @@ export const ImageBothSides = {
         },
       },
     },
-    getURLForAttachmentID: async () => "https://picsum.photos/id/200/539/323",
+    attachmentResolver: imageResolver,
   },
 } satisfies Story;

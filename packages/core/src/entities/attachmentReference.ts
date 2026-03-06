@@ -16,6 +16,7 @@ export enum AttachmentMIMEType {
   PNG = "image/png",
   JPEG = "image/jpeg",
   SVG = "image/svg+xml",
+  MP3 = "audio/mpeg",
 }
 
 export function getFileExtensionForAttachmentMIMEType(
@@ -34,9 +35,15 @@ export function getFileExtensionForAttachmentMIMEType(
       return "png";
     case AttachmentMIMEType.SVG:
       return "svg";
+    case AttachmentMIMEType.MP3:
+      return "mp3";
     default:
       return null;
   }
+}
+
+export function isAudioMIMEType(mimeType: AttachmentMIMEType): boolean {
+  return mimeType.startsWith("audio/");
 }
 
 // An intentionally quick and dirty mime type extractor: the libraries which map extensions to mime types are several kB.
@@ -53,6 +60,8 @@ export function getAttachmentMIMETypeForFilename(
     return AttachmentMIMEType.JPEG;
   } else if (uppercaseFilename.endsWith(".SVG")) {
     return AttachmentMIMEType.SVG;
+  } else if (uppercaseFilename.endsWith(".MP3")) {
+    return AttachmentMIMEType.MP3;
   } else {
     return null;
   }

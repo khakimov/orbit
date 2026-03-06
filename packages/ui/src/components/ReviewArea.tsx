@@ -1,4 +1,4 @@
-import { AttachmentID, TaskRepetitionOutcome } from "@withorbit/core";
+import { TaskRepetitionOutcome } from "@withorbit/core";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { ReviewAreaItem } from "../reviewAreaItem.js";
@@ -25,7 +25,6 @@ const PromptLayoutContainer = React.memo(function PromptLayoutContainer({
   onDidDisappear,
   reviewItem,
   backIsRevealed,
-  getURLForAttachmentID,
 }: {
   size: Size;
   displayState: PromptContainerState;
@@ -80,7 +79,6 @@ const PromptLayoutContainer = React.memo(function PromptLayoutContainer({
     >
       {reviewItem && (
         <Card
-          getURLForAttachmentID={getURLForAttachmentID}
           reviewItem={reviewItem}
           accentColor={reviewItem.colorPalette.accentColor}
           backIsRevealed={backIsRevealed}
@@ -94,14 +92,12 @@ interface PromptStackProps {
   items: ReviewAreaItem[];
   currentItemIndex: number;
   isShowingAnswer: boolean;
-  getURLForAttachmentID: (id: AttachmentID) => Promise<string | null>;
 }
 
 function PromptStack({
   items,
   currentItemIndex,
   isShowingAnswer,
-  getURLForAttachmentID,
 }: PromptStackProps) {
   const [departedCardCount, setDepartedCardCount] = useState(0);
   const departingPromptItems = useRef<ReviewAreaItem[]>([]);
@@ -167,7 +163,6 @@ function PromptStack({
               <PromptLayoutContainer
                 key={renderNodeIndex}
                 displayState={displayState}
-                getURLForAttachmentID={getURLForAttachmentID}
                 reviewItem={renderedItems[renderedItemIndex] || null}
                 onDidDisappear={onPromptDidDisappear}
                 size={containerSize}
@@ -190,7 +185,6 @@ export interface ReviewAreaProps {
   onPendingOutcomeChange: (
     pendingOutcome: TaskRepetitionOutcome | null,
   ) => void;
-  getURLForAttachmentID: (id: AttachmentID) => Promise<string | null>;
 
   sizeClass: SizeClass;
   insetBottom?: number;
@@ -205,7 +199,6 @@ export default React.memo(function ReviewArea({
   onMark,
   forceShowAnswer,
   onPendingOutcomeChange,
-  getURLForAttachmentID,
   sizeClass,
   insetBottom = 0,
 }: ReviewAreaProps) {
@@ -243,7 +236,6 @@ export default React.memo(function ReviewArea({
   return (
     <View style={{ flex: 1 }}>
       <PromptStack
-        getURLForAttachmentID={getURLForAttachmentID}
         currentItemIndex={currentItemIndex}
         isShowingAnswer={isShowingAnswer}
         items={items}

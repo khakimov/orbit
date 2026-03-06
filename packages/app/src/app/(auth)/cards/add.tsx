@@ -11,7 +11,11 @@ import {
   TaskSpecType,
   TaskUpdateSpecEvent,
 } from "@withorbit/core";
-import { PromptFieldRenderer, styles } from "@withorbit/ui";
+import {
+  AttachmentResolverProvider,
+  PromptFieldRenderer,
+  styles,
+} from "@withorbit/ui";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -64,7 +68,7 @@ const verdictLabels: Record<CardReview["verdict"], string> = {
 const { gridUnit, edgeMargin, maximumContentWidth, borderRadius } =
   styles.layout;
 
-interface PickedImage {
+interface PickedAttachment {
   uri: string;
   mimeType: AttachmentMIMEType;
 }
@@ -77,12 +81,14 @@ function mimeTypeFromPicker(raw: string | undefined | null): AttachmentMIMEType 
       return AttachmentMIMEType.JPEG;
     case "image/svg+xml":
       return AttachmentMIMEType.SVG;
+    case "audio/mpeg":
+      return AttachmentMIMEType.MP3;
     default:
       return null;
   }
 }
 
-async function fetchImageBytes(uri: string): Promise<Uint8Array> {
+async function fetchAttachmentBytes(uri: string): Promise<Uint8Array> {
   const response = await fetch(uri);
   const buffer = await response.arrayBuffer();
   return new Uint8Array(buffer);
@@ -98,7 +104,8 @@ export default function AddCardPage() {
 
   const [question, setQuestion] = useState(params.editQuestion ?? "");
   const [answer, setAnswer] = useState(params.editAnswer ?? "");
-  const [image, setImage] = useState<PickedImage | null>(null);
+  const [image, setImage] = useState<PickedAttachment | null>(null);
+  const [audio, setAudio] = useState<PickedAttachment | null>(null);
   const [context, setContext] = useState("");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -187,6 +194,24 @@ export default function AddCardPage() {
       return;
     }
     setImage({ uri: asset.uri, mimeType: mime });
+  }
+
+  function handlePickAudio() {
+    if (Platform.OS !== "web") return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "audio/mpeg,.mp3";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const mime = mimeTypeFromPicker(file.type);
+      if (!mime) {
+        showToast("Unsupported audio type. Use MP3.", 3000);
+        return;
+      }
+      setAudio({ uri: URL.createObjectURL(file), mimeType: mime });
+    };
+    input.click();
   }
 
   const canReview = useMemo(
@@ -307,17 +332,18 @@ export default function AddCardPage() {
       const events: (TaskIngestEvent | AttachmentIngestEvent | TaskUpdateSpecEvent)[] = [];
       const attachments: AttachmentID[] = [];
 
-      if (image) {
+      for (const picked of [image, audio]) {
+        if (!picked) continue;
         const attachmentID = generateUniqueID() as AttachmentID;
-        const bytes = await fetchImageBytes(image.uri);
-        await databaseManager.storeAttachment(bytes, attachmentID, image.mimeType);
+        const bytes = await fetchAttachmentBytes(picked.uri);
+        await databaseManager.storeAttachment(bytes, attachmentID, picked.mimeType);
 
         events.push({
           id: generateUniqueID(),
           type: EventType.AttachmentIngest as const,
           entityID: attachmentID,
           timestampMillis: Date.now(),
-          mimeType: image.mimeType,
+          mimeType: picked.mimeType,
         });
         attachments.push(attachmentID);
       }
@@ -367,6 +393,7 @@ export default function AddCardPage() {
         setQuestion("");
         setAnswer("");
         setImage(null);
+        setAudio(null);
         if (!contextPinned) setContext("");
         if (!sourcePinned) {
           setSourceTitle("");
@@ -393,12 +420,16 @@ export default function AddCardPage() {
     attachments: [],
   };
 
-  // For preview, resolve the picked image URI directly.
-  const getURLForAttachmentID = useCallback(
-    async (_id: AttachmentID): Promise<string | null> => {
-      return image?.uri ?? null;
+  // For preview, resolve picked attachments by matching ID position.
+  const attachmentResolver = useCallback(
+    async (_id: AttachmentID) => {
+      // In preview, attachments are ordered: image first, then audio.
+      // We match by checking which picked attachment exists.
+      if (image) return { url: image.uri, mimeType: image.mimeType };
+      if (audio) return { url: audio.uri, mimeType: audio.mimeType };
+      return null;
     },
-    [image],
+    [image, audio],
   );
 
   const { width } = useWindowDimensions();
@@ -513,6 +544,7 @@ export default function AddCardPage() {
               }}
             >
               <NavButton label="Attach Image" onPress={handlePickImage} />
+              <NavButton label="Attach Audio" onPress={handlePickAudio} />
               {image && (
                 <View style={{ position: "relative" }}>
                   <Image
@@ -545,6 +577,31 @@ export default function AddCardPage() {
                   </Pressable>
                 </View>
               )}
+              {audio && (
+                <View style={{ position: "relative", justifyContent: "center" }}>
+                  <Text style={{ color: neutral.text, fontSize: 13 }}>
+                    {"\u266B"} MP3
+                  </Text>
+                  <Pressable
+                    onPress={() => setAudio(null)}
+                    style={{
+                      position: "absolute",
+                      top: -6,
+                      right: -6,
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: neutral.text,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 12, lineHeight: 14, fontWeight: "bold" }}>
+                      {"\u00D7"}
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
 
             {/* Preview */}
@@ -556,6 +613,7 @@ export default function AddCardPage() {
             >
               Preview
             </Text>
+            <AttachmentResolverProvider value={attachmentResolver}>
             <View
               style={{
                 backgroundColor: neutral.card,
@@ -571,7 +629,6 @@ export default function AddCardPage() {
               </Text>
               <PromptFieldRenderer
                 promptField={questionPreview}
-                getURLForAttachmentID={getURLForAttachmentID}
                 largestSizeVariantIndex={4}
                 smallestSizeVariantIndex={4}
               />
@@ -581,11 +638,11 @@ export default function AddCardPage() {
               </Text>
               <PromptFieldRenderer
                 promptField={answerPreview}
-                getURLForAttachmentID={getURLForAttachmentID}
                 largestSizeVariantIndex={4}
                 smallestSizeVariantIndex={4}
               />
             </View>
+            </AttachmentResolverProvider>
 
             {/* Save */}
             <View

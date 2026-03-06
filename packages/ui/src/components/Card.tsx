@@ -1,5 +1,4 @@
 import {
-  AttachmentID,
   ClozeTaskContent,
   ClozeTaskContentComponent,
   QATaskContent,
@@ -202,7 +201,6 @@ function getProportions(contents: QATaskContent): {
 export interface CardProps {
   reviewItem: ReviewAreaItem;
   backIsRevealed: boolean;
-  getURLForAttachmentID: (id: AttachmentID) => Promise<string | null>;
 
   accentColor?: string;
 }
@@ -215,7 +213,6 @@ function QAPromptRenderer({
   backIsRevealed,
   accentColor,
   reviewItem,
-  getURLForAttachmentID,
 }: QAPromptRendererType) {
   const animatingStyles = useAnimatingStyles(backIsRevealed);
   const contents = getQAPromptContents(reviewItem);
@@ -251,7 +248,7 @@ function QAPromptRenderer({
         >
           <CardField
             promptField={contents.body}
-            getURLForAttachmentID={getURLForAttachmentID}
+
             largestSizeVariantIndex={
               frontSizeVariantIndex === undefined
                 ? undefined
@@ -272,7 +269,7 @@ function QAPromptRenderer({
         >
           <CardField
             promptField={contents.answer}
-            getURLForAttachmentID={getURLForAttachmentID}
+
           />
         </FadeView>
       </FadeView>
@@ -298,7 +295,7 @@ function QAPromptRenderer({
         <View style={{ flex: proportions.unrevealed[1] }}>
           <CardField
             promptField={contents.body}
-            getURLForAttachmentID={getURLForAttachmentID}
+
             onLayout={setFrontSizeVariantIndex}
           />
         </View>
@@ -315,7 +312,6 @@ function ClozePromptRenderer({
   backIsRevealed,
   accentColor,
   reviewItem,
-  getURLForAttachmentID,
 }: ClozePromptRendererProps) {
   const {
     componentID,
@@ -356,7 +352,7 @@ function ClozePromptRenderer({
         >
           <CardField
             promptField={back}
-            getURLForAttachmentID={getURLForAttachmentID}
+
             colorPalette={reviewItem.colorPalette}
           />
         </FadeView>
@@ -367,7 +363,7 @@ function ClozePromptRenderer({
         >
           <CardField
             promptField={front}
-            getURLForAttachmentID={getURLForAttachmentID}
+
             colorPalette={reviewItem.colorPalette}
           />
         </FadeView>

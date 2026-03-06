@@ -10,6 +10,15 @@ export type { CardProps } from "./components/Card.jsx";
 
 export { default as PromptFieldRenderer } from "./components/PromptFieldRenderer.js";
 
+export {
+  AttachmentResolverProvider,
+  useAttachmentResolver,
+} from "./components/AttachmentResolverContext.js";
+export type {
+  AttachmentResolution,
+  AttachmentResolver,
+} from "./components/AttachmentResolverContext.js";
+
 export { default as ContinueWithUser } from "./components/ContinueWithUser.jsx";
 
 export { default as FadeView } from "./components/FadeView.jsx";

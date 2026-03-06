@@ -31,7 +31,12 @@ import {
   renderInlineMath,
 } from "./PromptFieldRenderer/markdownLatexSupport.js";
 import { SawtoothPattern } from "./SawtoothPattern.jsx";
-import { AttachmentID, TaskContentField } from "@withorbit/core";
+import { isAudioMIMEType, TaskContentField } from "@withorbit/core";
+import {
+  AttachmentResolution,
+  useAttachmentResolver,
+} from "./AttachmentResolverContext.js";
+import AudioPlayButton from "./AudioPlayButton.jsx";
 
 const sizeVariantCount = 5;
 const defaultSmallestSizeVariant = 4;
@@ -284,20 +289,22 @@ function useImageSize(
   }, [containerSize, size]);
 }
 
-function useImageURL(
+function useAttachmentResolution(
   contentField: TaskContentField,
-  getURLForAttachmentID: (id: AttachmentID) => Promise<string | null>,
-): string | null {
-  const [imageURL, setImageURL] = useState<string | null>(null);
+): AttachmentResolution | null {
+  const resolver = useAttachmentResolver();
+  const [resolution, setResolution] = useState<AttachmentResolution | null>(
+    null,
+  );
   const pendingContentField = useRef<TaskContentField | null>(null);
 
-  const _getURLForAttachmentID = useWeakRef(getURLForAttachmentID);
+  const _resolver = useWeakRef(resolver);
   useEffect(() => {
-    setImageURL(null);
+    setResolution(null);
     pendingContentField.current = contentField;
     const attachmentID = contentField.attachments[0];
     if (attachmentID) {
-      _getURLForAttachmentID.current(attachmentID).then((url) => {
+      _resolver.current(attachmentID).then((result) => {
         if (
           pendingContentField.current === null ||
           contentField !== pendingContentField.current
@@ -305,26 +312,25 @@ function useImageURL(
           return;
         }
 
-        if (!url) {
+        if (!result) {
           // TODO: recover more gracefully, show UI indicating it's missing...
           throw new Error(`Missing attachment ${attachmentID}`);
         }
 
-        setImageURL(url);
+        setResolution(result);
       });
     }
 
     return () => {
       pendingContentField.current = null;
     };
-  }, [_getURLForAttachmentID, contentField]);
+  }, [_resolver, contentField]);
 
-  return imageURL;
+  return resolution;
 }
 
 export default React.memo(function PromptFieldRenderer(props: {
   promptField: TaskContentField;
-  getURLForAttachmentID: (id: AttachmentID) => Promise<string | null>;
 
   colorPalette?: colors.ColorPalette;
   clipContent?: boolean;
@@ -335,7 +341,6 @@ export default React.memo(function PromptFieldRenderer(props: {
 }) {
   const {
     promptField,
-    getURLForAttachmentID,
     colorPalette,
     onLayout,
     largestSizeVariantIndex,
@@ -374,7 +379,11 @@ export default React.memo(function PromptFieldRenderer(props: {
     );
   }, [effectiveLargestSizeVariantIndex]);
 
-  const imageURL = useImageURL(promptField, getURLForAttachmentID);
+  const attachmentResolution = useAttachmentResolution(promptField);
+  const isAudio = attachmentResolution
+    ? isAudioMIMEType(attachmentResolution.mimeType)
+    : false;
+  const imageURL = isAudio ? null : (attachmentResolution?.url ?? null);
   const imageSize = useImageSize(imageURL, containerSize);
   useLayoutEffect(() => {
     if (
@@ -495,6 +504,9 @@ export default React.memo(function PromptFieldRenderer(props: {
             console.warn(`Error displaying image`, error)
           }
         />
+      )}
+      {isAudio && attachmentResolution && (
+        <AudioPlayButton url={attachmentResolution.url} />
       )}
     </View>
   );

@@ -94,11 +94,14 @@ export class DatabaseManager {
 
   async getURLForAttachmentID(
     attachmentID: AttachmentID,
-  ): Promise<string | null> {
+  ): Promise<{ url: string; mimeType: AttachmentMIMEType } | null> {
     const store = await this._storePromise;
     const localURL =
       await store.attachmentStore.getURLForStoredAttachment(attachmentID);
-    if (localURL) return localURL;
+    if (localURL) {
+      const { type } = await store.attachmentStore.getAttachment(attachmentID);
+      return { url: localURL, mimeType: type };
+    }
 
     // Not found locally — trigger background fetch from Supabase.
     this._fetchAndCacheAttachment(attachmentID);

@@ -1,7 +1,9 @@
 import {
   AttachmentID,
+  AttachmentMIMEType,
   defaultSpacedRepetitionSchedulerConfiguration,
   EventForEntity,
+  getAttachmentMIMETypeForFilename,
   ReviewItem,
   Task,
   TaskID,
@@ -16,6 +18,7 @@ import {
   EmbeddedScreenOnLoadEvent,
 } from "@withorbit/embedded-support";
 import {
+  AttachmentResolverProvider,
   FadeView,
   ReviewArea,
   ReviewAreaItem,
@@ -88,8 +91,6 @@ interface EmbeddedScreenRendererProps extends ReviewSessionManagerState {
   hostState: EmbeddedHostState | null;
   hasUncommittedActions: boolean;
   isDebug?: boolean;
-  getURLForAttachmentID: (id: AttachmentID) => Promise<string | null>;
-
   // these review session manager fields can't be null
   currentReviewAreaQueueIndex: number;
   currentSessionItemIndex: number;
@@ -104,7 +105,6 @@ function EmbeddedScreenRenderer({
   hostState,
   hasUncommittedActions,
   isDebug,
-  getURLForAttachmentID,
   currentSessionItemIndex,
   currentReviewAreaQueueIndex,
   sessionItems,
@@ -252,7 +252,6 @@ function EmbeddedScreenRenderer({
           }}
           insetBottom={0}
           sizeClass={widthSizeClass}
-          getURLForAttachmentID={getURLForAttachmentID}
         />
       )}
       {isComplete && (
@@ -391,8 +390,14 @@ function EmbeddedPage({
     }
     return null;
   });
-  const getURLForAttachmentIDAsync = useByrefCallback(
-    async (id: AttachmentID) => getURLForAttachmentID(id),
+  const attachmentResolver = useByrefCallback(
+    async (id: AttachmentID) => {
+      const url = getURLForAttachmentID(id);
+      if (!url) return null;
+      const mimeType =
+        getAttachmentMIMETypeForFilename(url) ?? AttachmentMIMEType.PNG;
+      return { url, mimeType };
+    },
   );
 
   const { commitActionsRecord, hasUncommittedActions } =
@@ -464,20 +469,21 @@ function EmbeddedPage({
             return null;
           }
           return (
-            <EmbeddedScreenRenderer
-              {...reviewSessionManager}
-              currentReviewAreaQueueIndex={currentReviewAreaQueueIndex}
-              currentSessionItemIndex={currentSessionItemIndex}
-              onMark={onMark}
-              containerSize={containerSize}
-              authenticationState={authenticationState}
-              colorPalette={colorPalette}
-              hostState={hostState}
-              hasUncommittedActions={hasUncommittedActions}
-              isDebug={configuration.isDebug}
-              wasInitiallyComplete={wasInitiallyComplete}
-              getURLForAttachmentID={getURLForAttachmentIDAsync}
-            />
+            <AttachmentResolverProvider value={attachmentResolver}>
+              <EmbeddedScreenRenderer
+                {...reviewSessionManager}
+                currentReviewAreaQueueIndex={currentReviewAreaQueueIndex}
+                currentSessionItemIndex={currentSessionItemIndex}
+                onMark={onMark}
+                containerSize={containerSize}
+                authenticationState={authenticationState}
+                colorPalette={colorPalette}
+                hostState={hostState}
+                hasUncommittedActions={hasUncommittedActions}
+                isDebug={configuration.isDebug}
+                wasInitiallyComplete={wasInitiallyComplete}
+              />
+            </AttachmentResolverProvider>
           );
         }}
       </ReviewSessionContainer>
