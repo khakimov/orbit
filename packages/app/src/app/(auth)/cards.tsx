@@ -110,16 +110,20 @@ function CardRow({
         marginBottom: gridUnit,
       }}
     >
-      <Text style={[styles.type.promptSmall.typeStyle, { color: neutral.text }]}>
-        {question}
-      </Text>
+      {question ? (
+        <Text style={[styles.type.promptSmall.typeStyle, { color: neutral.text }]}>
+          {question}
+        </Text>
+      ) : audioURL ? (
+        <InlineAudioButton url={audioURL} />
+      ) : null}
       <View style={{ height: gridUnit / 2 }} />
       <Text
         style={[styles.type.runningTextSmall.typeStyle, { color: neutral.textSoft }]}
       >
         {answer}
       </Text>
-      {audioURL && (
+      {question && audioURL && (
         <View style={{ marginTop: gridUnit }}>
           <InlineAudioButton url={audioURL} />
         </View>
@@ -177,7 +181,7 @@ export default function CardsPage() {
       const content = task.spec.content;
       if (content.type !== TaskContentType.QA) continue;
       const qa = content as QATaskContent;
-      for (const id of qa.body.attachments) {
+      for (const id of [...qa.body.attachments, ...qa.answer.attachments]) {
         pending.push(
           databaseManager.getURLForAttachmentID(id as AttachmentID).then((result) => {
             if (result && isAudioMIMEType(result.mimeType)) {
