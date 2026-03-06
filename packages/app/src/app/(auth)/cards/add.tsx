@@ -71,6 +71,64 @@ const { gridUnit, edgeMargin, maximumContentWidth, borderRadius } =
 interface PickedAttachment {
   uri: string;
   mimeType: AttachmentMIMEType;
+  name?: string;
+}
+
+type SidedAttachment = PickedAttachment & { side: "q" | "a" };
+
+function AttachmentChip({
+  label,
+  side,
+  onSideChange,
+  onRemove,
+  children,
+}: {
+  label: string;
+  side: "q" | "a";
+  onSideChange: (side: "q" | "a") => void;
+  onRemove: () => void;
+  children?: React.ReactNode;
+}) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      {children}
+      <Text style={{ color: neutral.text, fontSize: 13, maxWidth: 120 }} numberOfLines={1}>{label}</Text>
+      <Text style={{ color: neutral.textSoft, fontSize: 11 }}>on</Text>
+      <View style={{ flexDirection: "row", borderRadius: 4, borderWidth: 1, borderColor: neutral.border, overflow: "hidden" }}>
+        <Pressable
+          onPress={() => onSideChange("q")}
+          style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: side === "q" ? neutral.text : "transparent" }}
+          accessibilityLabel="Place on question side"
+          accessibilityState={{ selected: side === "q" }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: "600", color: side === "q" ? "#fff" : neutral.textSoft }}>Q</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => onSideChange("a")}
+          style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: side === "a" ? neutral.text : "transparent" }}
+          accessibilityLabel="Place on answer side"
+          accessibilityState={{ selected: side === "a" }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: "600", color: side === "a" ? "#fff" : neutral.textSoft }}>A</Text>
+        </Pressable>
+      </View>
+      <Pressable
+        onPress={onRemove}
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: 10,
+          backgroundColor: neutral.text,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Text style={{ color: "#fff", fontSize: 12, lineHeight: 14, fontWeight: "bold" }}>
+          {"\u00D7"}
+        </Text>
+      </Pressable>
+    </View>
+  );
 }
 
 function mimeTypeFromPicker(raw: string | undefined | null): AttachmentMIMEType | null {
@@ -104,8 +162,8 @@ export default function AddCardPage() {
 
   const [question, setQuestion] = useState(params.editQuestion ?? "");
   const [answer, setAnswer] = useState(params.editAnswer ?? "");
-  const [image, setImage] = useState<(PickedAttachment & { side: "q" | "a" }) | null>(null);
-  const [audio, setAudio] = useState<(PickedAttachment & { side: "q" | "a" }) | null>(null);
+  const [image, setImage] = useState<SidedAttachment | null>(null);
+  const [audio, setAudio] = useState<SidedAttachment | null>(null);
   const [context, setContext] = useState("");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -210,7 +268,7 @@ export default function AddCardPage() {
         return;
       }
       if (audio) URL.revokeObjectURL(audio.uri);
-      setAudio({ uri: URL.createObjectURL(file), mimeType: mime, side: "a" });
+      setAudio({ uri: URL.createObjectURL(file), mimeType: mime, side: "a", name: file.name });
     };
     input.click();
   }
@@ -572,7 +630,12 @@ export default function AddCardPage() {
               <NavButton label="Attach Image" onPress={handlePickImage} />
               <NavButton label="Attach Audio" onPress={handlePickAudio} />
               {image && (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <AttachmentChip
+                  label={image.name ?? "Image"}
+                  side={image.side}
+                  onSideChange={(s) => setImage({ ...image, side: s })}
+                  onRemove={() => setImage(null)}
+                >
                   <Image
                     source={{ uri: image.uri }}
                     style={{
@@ -583,80 +646,15 @@ export default function AddCardPage() {
                       borderColor: neutral.border,
                     }}
                   />
-                  <View style={{ flexDirection: "row", borderRadius: 4, borderWidth: 1, borderColor: neutral.border, overflow: "hidden" }}>
-                    <Pressable
-                      onPress={() => setImage({ ...image, side: "q" })}
-                      style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: image.side === "q" ? neutral.text : "transparent" }}
-                      accessibilityLabel="Place on question side"
-                      accessibilityState={{ selected: image.side === "q" }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: "600", color: image.side === "q" ? "#fff" : neutral.textSoft }}>Q</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setImage({ ...image, side: "a" })}
-                      style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: image.side === "a" ? neutral.text : "transparent" }}
-                      accessibilityLabel="Place on answer side"
-                      accessibilityState={{ selected: image.side === "a" }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: "600", color: image.side === "a" ? "#fff" : neutral.textSoft }}>A</Text>
-                    </Pressable>
-                  </View>
-                  <Pressable
-                    onPress={() => setImage(null)}
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      backgroundColor: neutral.text,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={{ color: "#fff", fontSize: 12, lineHeight: 14, fontWeight: "bold" }}>
-                      {"\u00D7"}
-                    </Text>
-                  </Pressable>
-                </View>
+                </AttachmentChip>
               )}
               {audio && (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ color: neutral.text, fontSize: 13 }}>
-                    {"\u266B"} MP3
-                  </Text>
-                  <View style={{ flexDirection: "row", borderRadius: 4, borderWidth: 1, borderColor: neutral.border, overflow: "hidden" }}>
-                    <Pressable
-                      onPress={() => setAudio({ ...audio, side: "q" })}
-                      style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: audio.side === "q" ? neutral.text : "transparent" }}
-                      accessibilityLabel="Place on question side"
-                      accessibilityState={{ selected: audio.side === "q" }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: "600", color: audio.side === "q" ? "#fff" : neutral.textSoft }}>Q</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setAudio({ ...audio, side: "a" })}
-                      style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: audio.side === "a" ? neutral.text : "transparent" }}
-                      accessibilityLabel="Place on answer side"
-                      accessibilityState={{ selected: audio.side === "a" }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: "600", color: audio.side === "a" ? "#fff" : neutral.textSoft }}>A</Text>
-                    </Pressable>
-                  </View>
-                  <Pressable
-                    onPress={() => setAudio(null)}
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      backgroundColor: neutral.text,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={{ color: "#fff", fontSize: 12, lineHeight: 14, fontWeight: "bold" }}>
-                      {"\u00D7"}
-                    </Text>
-                  </Pressable>
-                </View>
+                <AttachmentChip
+                  label={audio.name ? `\u266B ${audio.name}` : "\u266B MP3"}
+                  side={audio.side}
+                  onSideChange={(s) => setAudio({ ...audio, side: s })}
+                  onRemove={() => setAudio(null)}
+                />
               )}
             </View>
 
