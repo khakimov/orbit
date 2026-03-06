@@ -103,40 +103,46 @@ export class DatabaseManager {
       return { url: localURL, mimeType: type };
     }
 
-    // Not found locally — trigger background fetch from Supabase.
-    this._fetchAndCacheAttachment(attachmentID);
+    // Not found locally — fetch from Supabase and wait.
+    const fetched = await this._fetchAndCacheAttachment(attachmentID);
+    if (fetched) {
+      const cachedURL =
+        await store.attachmentStore.getURLForStoredAttachment(attachmentID);
+      if (cachedURL) {
+        return { url: cachedURL, mimeType: fetched.mimeType };
+      }
+    }
     return null;
   }
 
-  private _fetchAndCacheAttachment(id: AttachmentID): void {
-    if (!this._syncAdapter) return;
-    if (this._pendingAttachmentFetches.has(id)) return;
-    if (this._failedAttachmentFetches.has(id)) return; // Don't retry failed fetches
+  private async _fetchAndCacheAttachment(
+    id: AttachmentID,
+  ): Promise<{ mimeType: AttachmentMIMEType } | null> {
+    if (!this._syncAdapter) return null;
+    if (this._pendingAttachmentFetches.has(id)) return null;
+    if (this._failedAttachmentFetches.has(id)) return null;
     this._pendingAttachmentFetches.add(id);
 
-    this._syncAdapter
-      .pullAttachment(id)
-      .then(async (result) => {
-        if (!result) {
-          // 404 - attachment doesn't exist in storage, mark as failed
-          this._failedAttachmentFetches.add(id);
-          return;
-        }
-        const store = await this._storePromise;
-        await store.attachmentStore.storeAttachment(
-          result.contents,
-          id,
-          result.mimeType,
-        );
-        console.info("[Sync] Cached attachment from remote:", id);
-      })
-      .catch((error) => {
-        console.error("[Sync] Attachment fetch failed:", error);
-        // Don't mark as failed on network errors — allow retry on next access
-      })
-      .finally(() => {
-        this._pendingAttachmentFetches.delete(id);
-      });
+    try {
+      const result = await this._syncAdapter.pullAttachment(id);
+      if (!result) {
+        this._failedAttachmentFetches.add(id);
+        return null;
+      }
+      const store = await this._storePromise;
+      await store.attachmentStore.storeAttachment(
+        result.contents,
+        id,
+        result.mimeType,
+      );
+      console.info("[Sync] Cached attachment from remote:", id);
+      return { mimeType: result.mimeType };
+    } catch (error) {
+      console.error("[Sync] Attachment fetch failed:", error);
+      return null;
+    } finally {
+      this._pendingAttachmentFetches.delete(id);
+    }
   }
 
   private async _pullFromRemote(): Promise<void> {
