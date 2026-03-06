@@ -484,6 +484,130 @@ export default function AddCardPage() {
     }
   }
 
+  async function handleSave3Cards() {
+    if (!databaseManager) return;
+    if (!question.trim() || !answer.trim() || !audio) {
+      showToast("Need question, answer, and audio for 3-card save.", 3000);
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const events: (TaskIngestEvent | AttachmentIngestEvent)[] = [];
+
+      // Ingest audio attachment once, reuse across cards
+      const audioID = generateUniqueID() as AttachmentID;
+      const audioBytes = await fetchAttachmentBytes(audio.uri);
+      await databaseManager.storeAttachment(audioBytes, audioID, audio.mimeType);
+      events.push({
+        id: generateUniqueID(),
+        type: EventType.AttachmentIngest as const,
+        entityID: audioID,
+        timestampMillis: Date.now(),
+        mimeType: audio.mimeType,
+      });
+
+      // Ingest image if present
+      let imageID: AttachmentID | null = null;
+      if (image) {
+        imageID = generateUniqueID() as AttachmentID;
+        const imageBytes = await fetchAttachmentBytes(image.uri);
+        await databaseManager.storeAttachment(imageBytes, imageID, image.mimeType);
+        events.push({
+          id: generateUniqueID(),
+          type: EventType.AttachmentIngest as const,
+          entityID: imageID,
+          timestampMillis: Date.now(),
+          mimeType: image.mimeType,
+        });
+      }
+
+      const q = question.trim();
+      const a = answer.trim();
+      const provenance = sourceTitle.trim() || sourceUrl.trim()
+        ? {
+            identifier: sourceUrl.trim() || `source:${sourceTitle.trim().toLowerCase().replace(/\s+/g, "-")}`,
+            ...(sourceUrl.trim() ? { url: sourceUrl.trim() } : {}),
+            ...(sourceTitle.trim() ? { title: sourceTitle.trim() } : {}),
+          }
+        : null;
+
+      const imgArr = imageID ? [imageID] : [];
+
+      // Card 1: Q: Thai script → A: romanization + audio
+      events.push({
+        id: generateUniqueID(),
+        type: EventType.TaskIngest as const,
+        entityID: generateUniqueID<TaskID>(),
+        timestampMillis: Date.now(),
+        spec: {
+          type: TaskSpecType.Memory as const,
+          content: {
+            type: TaskContentType.QA as const,
+            body: { text: q, attachments: imgArr },
+            answer: { text: a, attachments: [audioID] },
+          },
+        },
+        provenance,
+      });
+
+      // Card 2: Q: romanization → A: Thai script (no audio)
+      events.push({
+        id: generateUniqueID(),
+        type: EventType.TaskIngest as const,
+        entityID: generateUniqueID<TaskID>(),
+        timestampMillis: Date.now(),
+        spec: {
+          type: TaskSpecType.Memory as const,
+          content: {
+            type: TaskContentType.QA as const,
+            body: { text: a, attachments: [] as AttachmentID[] },
+            answer: { text: q, attachments: imgArr },
+          },
+        },
+        provenance,
+      });
+
+      // Card 3: Q: audio → A: Thai script + romanization
+      events.push({
+        id: generateUniqueID(),
+        type: EventType.TaskIngest as const,
+        entityID: generateUniqueID<TaskID>(),
+        timestampMillis: Date.now(),
+        spec: {
+          type: TaskSpecType.Memory as const,
+          content: {
+            type: TaskContentType.QA as const,
+            body: { text: "", attachments: [audioID] },
+            answer: { text: `${q}\n${a}`, attachments: imgArr },
+          },
+        },
+        provenance,
+      });
+
+      await databaseManager.recordEvents(events);
+
+      setQuestion("");
+      setAnswer("");
+      setImage(null);
+      setAudio(null);
+      if (!contextPinned) setContext("");
+      if (!sourcePinned) {
+        setSourceTitle("");
+        setSourceUrl("");
+      }
+      setReview(null);
+      setReviewError(null);
+      showToast("Saved 3 cards!");
+    } catch (error) {
+      console.error("Failed to save 3 cards:", error);
+      showToast("Save failed. Check console.", 3000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const questionPreviewAttachments: AttachmentID[] = [];
   const answerPreviewAttachments: AttachmentID[] = [];
   if (image) {
@@ -713,6 +837,13 @@ export default function AddCardPage() {
                 primary
                 disabled={!databaseManager || saving}
               />
+              {!editId && audio && (
+                <NavButton
+                  label={saving ? "Saving..." : "Save 3 Cards"}
+                  onPress={handleSave3Cards}
+                  disabled={!databaseManager || saving || !question.trim() || !answer.trim()}
+                />
+              )}
               <NavButton
                 label={reviewing ? "Reviewing..." : "Review with AI"}
                 onPress={handleReview}
