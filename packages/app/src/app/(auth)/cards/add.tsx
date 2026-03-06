@@ -104,8 +104,8 @@ export default function AddCardPage() {
 
   const [question, setQuestion] = useState(params.editQuestion ?? "");
   const [answer, setAnswer] = useState(params.editAnswer ?? "");
-  const [image, setImage] = useState<PickedAttachment | null>(null);
-  const [audio, setAudio] = useState<PickedAttachment | null>(null);
+  const [image, setImage] = useState<(PickedAttachment & { side: "q" | "a" }) | null>(null);
+  const [audio, setAudio] = useState<(PickedAttachment & { side: "q" | "a" }) | null>(null);
   const [context, setContext] = useState("");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -193,7 +193,7 @@ export default function AddCardPage() {
       showToast("Unsupported image type. Use PNG, JPEG, or SVG.", 3000);
       return;
     }
-    setImage({ uri: asset.uri, mimeType: mime });
+    setImage({ uri: asset.uri, mimeType: mime, side: "q" });
   }
 
   function handlePickAudio() {
@@ -209,7 +209,7 @@ export default function AddCardPage() {
         showToast("Unsupported audio type. Use MP3.", 3000);
         return;
       }
-      setAudio({ uri: URL.createObjectURL(file), mimeType: mime });
+      setAudio({ uri: URL.createObjectURL(file), mimeType: mime, side: "a" });
     };
     input.click();
   }
@@ -330,7 +330,8 @@ export default function AddCardPage() {
 
     try {
       const events: (TaskIngestEvent | AttachmentIngestEvent | TaskUpdateSpecEvent)[] = [];
-      const attachments: AttachmentID[] = [];
+      const bodyAttachments: AttachmentID[] = [];
+      const answerAttachments: AttachmentID[] = [];
 
       for (const picked of [image, audio]) {
         if (!picked) continue;
@@ -345,15 +346,19 @@ export default function AddCardPage() {
           timestampMillis: Date.now(),
           mimeType: picked.mimeType,
         });
-        attachments.push(attachmentID);
+        if (picked.side === "q") {
+          bodyAttachments.push(attachmentID);
+        } else {
+          answerAttachments.push(attachmentID);
+        }
       }
 
       const spec = {
         type: TaskSpecType.Memory as const,
         content: {
           type: TaskContentType.QA as const,
-          body: { text: question.trim(), attachments },
-          answer: { text: answer.trim(), attachments: [] as AttachmentID[] },
+          body: { text: question.trim(), attachments: bodyAttachments },
+          answer: { text: answer.trim(), attachments: answerAttachments },
         },
       };
 
@@ -411,22 +416,33 @@ export default function AddCardPage() {
     }
   }
 
-  const questionPreview: TaskContentField = image
-    ? { text: question || "Your question here...", attachments: ["preview" as AttachmentID] }
-    : { text: question || "Your question here...", attachments: [] };
+  const questionPreviewAttachments: AttachmentID[] = [];
+  const answerPreviewAttachments: AttachmentID[] = [];
+  if (image) {
+    (image.side === "q" ? questionPreviewAttachments : answerPreviewAttachments)
+      .push("preview-img" as AttachmentID);
+  }
+  if (audio) {
+    (audio.side === "q" ? questionPreviewAttachments : answerPreviewAttachments)
+      .push("preview-audio" as AttachmentID);
+  }
+
+  const questionPreview: TaskContentField = {
+    text: question || "Your question here...",
+    attachments: questionPreviewAttachments,
+  };
 
   const answerPreview: TaskContentField = {
     text: answer || "Your answer here...",
-    attachments: [],
+    attachments: answerPreviewAttachments,
   };
 
-  // For preview, resolve picked attachments by matching ID position.
   const attachmentResolver = useCallback(
-    async (_id: AttachmentID) => {
-      // In preview, attachments are ordered: image first, then audio.
-      // We match by checking which picked attachment exists.
-      if (image) return { url: image.uri, mimeType: image.mimeType };
-      if (audio) return { url: audio.uri, mimeType: audio.mimeType };
+    async (id: AttachmentID) => {
+      if (id === ("preview-img" as AttachmentID) && image)
+        return { url: image.uri, mimeType: image.mimeType };
+      if (id === ("preview-audio" as AttachmentID) && audio)
+        return { url: audio.uri, mimeType: audio.mimeType };
       return null;
     },
     [image, audio],
@@ -546,7 +562,10 @@ export default function AddCardPage() {
               <NavButton label="Attach Image" onPress={handlePickImage} />
               <NavButton label="Attach Audio" onPress={handlePickAudio} />
               {image && (
-                <View style={{ position: "relative" }}>
+                <Pressable
+                  onPress={() => setImage({ ...image, side: image.side === "q" ? "a" : "q" })}
+                  style={{ position: "relative", flexDirection: "row", alignItems: "center", gap: 4 }}
+                >
                   <Image
                     source={{ uri: image.uri }}
                     style={{
@@ -557,33 +576,11 @@ export default function AddCardPage() {
                       borderColor: neutral.border,
                     }}
                   />
-                  <Pressable
-                    onPress={() => setImage(null)}
-                    style={{
-                      position: "absolute",
-                      top: -6,
-                      right: -6,
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      backgroundColor: neutral.text,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={{ color: "#fff", fontSize: 12, lineHeight: 14, fontWeight: "bold" }}>
-                      {"\u00D7"}
-                    </Text>
-                  </Pressable>
-                </View>
-              )}
-              {audio && (
-                <View style={{ position: "relative", justifyContent: "center" }}>
-                  <Text style={{ color: neutral.text, fontSize: 13 }}>
-                    {"\u266B"} MP3
+                  <Text style={{ color: neutral.textSoft, fontSize: 12 }}>
+                    ({image.side === "q" ? "Q" : "A"})
                   </Text>
                   <Pressable
-                    onPress={() => setAudio(null)}
+                    onPress={(e) => { e.stopPropagation(); setImage(null); }}
                     style={{
                       position: "absolute",
                       top: -6,
@@ -600,7 +597,35 @@ export default function AddCardPage() {
                       {"\u00D7"}
                     </Text>
                   </Pressable>
-                </View>
+                </Pressable>
+              )}
+              {audio && (
+                <Pressable
+                  onPress={() => setAudio({ ...audio, side: audio.side === "q" ? "a" : "q" })}
+                  style={{ position: "relative", justifyContent: "center" }}
+                >
+                  <Text style={{ color: neutral.text, fontSize: 13 }}>
+                    {"\u266B"} MP3 ({audio.side === "q" ? "Q" : "A"})
+                  </Text>
+                  <Pressable
+                    onPress={(e) => { e.stopPropagation(); setAudio(null); }}
+                    style={{
+                      position: "absolute",
+                      top: -6,
+                      right: -6,
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: neutral.text,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 12, lineHeight: 14, fontWeight: "bold" }}>
+                      {"\u00D7"}
+                    </Text>
+                  </Pressable>
+                </Pressable>
               )}
             </View>
 
