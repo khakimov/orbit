@@ -450,32 +450,46 @@ export default React.memo(function PromptFieldRenderer(props: {
         setContainerSize(event.nativeEvent.layout);
       }, [])}
     >
-      <View
-        style={{
-          height: isLayoutReady ? undefined : 10000,
-        }}
-      >
-        <Markdown
-          rules={useMemo(
-            () =>
-              getMarkdownRenderRules((event) =>
-                setMarkdownHeight(event.nativeEvent.layout.height),
-              ),
-            [],
-          )}
-          style={useMemo(
-            () =>
-              getMarkdownStyles(
-                sizeVariants[sizeVariantIndex],
-                effectiveAccentColor,
-              ),
-            [effectiveAccentColor, sizeVariantIndex],
-          )}
-          mergeStyle={false}
-          markdownit={markdownItInstance}
+      <View>
+        <View
+          style={{
+            height: isLayoutReady ? undefined : 10000,
+          }}
         >
-          {promptField.text}
-        </Markdown>
+          <Markdown
+            rules={useMemo(
+              () =>
+                getMarkdownRenderRules((event) =>
+                  setMarkdownHeight(event.nativeEvent.layout.height),
+                ),
+              [],
+            )}
+            style={useMemo(
+              () =>
+                getMarkdownStyles(
+                  sizeVariants[sizeVariantIndex],
+                  effectiveAccentColor,
+                ),
+              [effectiveAccentColor, sizeVariantIndex],
+            )}
+            mergeStyle={false}
+            markdownit={markdownItInstance}
+          >
+            {promptField.text}
+          </Markdown>
+        </View>
+        {isAudio && attachmentResolution && (
+          <AudioPlayButton url={attachmentResolution.url} />
+        )}
+        {imageURL && imageSize && (
+          <Image
+            source={{ uri: imageURL }}
+            style={{ ...imageSize, flexShrink: 0, marginTop: layout.gridUnit }}
+            onError={({ nativeEvent: { error } }) =>
+              console.warn(`Error displaying image`, error)
+            }
+          />
+        )}
       </View>
       {shouldClipContent && (
         <View
@@ -495,18 +509,6 @@ export default React.memo(function PromptFieldRenderer(props: {
             }}
           />
         </View>
-      )}
-      {imageURL && imageSize && (
-        <Image
-          source={{ uri: imageURL }}
-          style={{ ...imageSize, flexShrink: 0, marginTop: layout.gridUnit }}
-          onError={({ nativeEvent: { error } }) =>
-            console.warn(`Error displaying image`, error)
-          }
-        />
-      )}
-      {isAudio && attachmentResolution && (
-        <AudioPlayButton url={attachmentResolution.url} />
       )}
     </View>
   );
