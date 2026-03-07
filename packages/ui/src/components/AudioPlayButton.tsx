@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "flex-start",
-    marginTop: layout.gridUnit,
+    marginTop: layout.gridUnit * 2,
   },
   buttonPressed: {
     opacity: 0.7,
