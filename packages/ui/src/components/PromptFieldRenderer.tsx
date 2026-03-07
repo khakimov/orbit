@@ -334,6 +334,7 @@ export default React.memo(function PromptFieldRenderer(props: {
 
   colorPalette?: colors.ColorPalette;
   clipContent?: boolean;
+  suppressAudio?: boolean;
 
   onLayout?: (sizeVariant: number) => void;
   largestSizeVariantIndex?: number;
@@ -478,7 +479,7 @@ export default React.memo(function PromptFieldRenderer(props: {
             {promptField.text}
           </Markdown>
         </View>
-        {isAudio && attachmentResolution && (
+        {isAudio && attachmentResolution && !props.suppressAudio && (
           <AudioPlayButton url={attachmentResolution.url} />
         )}
         {imageURL && imageSize && (

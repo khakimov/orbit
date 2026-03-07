@@ -4,6 +4,7 @@ import { layout } from "../styles/index.js";
 
 interface AudioPlayButtonProps {
   url: string;
+  size?: "regular" | "large";
 }
 
 function useAudioPlayback(url: string) {
@@ -60,30 +61,32 @@ function useAudioPlayback(url: string) {
 }
 
 // Triangle (play) and square (stop) drawn with plain Views
-function PlayIcon() {
+function PlayIcon({ large }: { large?: boolean }) {
+  const scale = large ? 2 : 1;
   return (
     <View
       style={{
         width: 0,
         height: 0,
-        borderLeftWidth: 14,
-        borderTopWidth: 9,
-        borderBottomWidth: 9,
+        borderLeftWidth: 14 * scale,
+        borderTopWidth: 9 * scale,
+        borderBottomWidth: 9 * scale,
         borderLeftColor: "#fff",
         borderTopColor: "transparent",
         borderBottomColor: "transparent",
-        marginLeft: 3,
+        marginLeft: 3 * scale,
       }}
     />
   );
 }
 
-function StopIcon() {
+function StopIcon({ large }: { large?: boolean }) {
+  const s = large ? 24 : 12;
   return (
     <View
       style={{
-        width: 12,
-        height: 12,
+        width: s,
+        height: s,
         backgroundColor: "#fff",
         borderRadius: 1,
       }}
@@ -93,37 +96,36 @@ function StopIcon() {
 
 export default React.memo(function AudioPlayButton({
   url,
+  size = "regular",
 }: AudioPlayButtonProps) {
   const { isPlaying, toggle } = useAudioPlayback(url);
+  const large = size === "large";
+  const s = large ? layout.gridUnit * 10 : layout.gridUnit * 5;
 
   return (
     <Pressable
       onPress={toggle}
       style={({ pressed }) => [
-        styles.button,
+        {
+          width: s,
+          height: s,
+          borderRadius: s / 2,
+          backgroundColor: "rgba(0,0,0,0.15)",
+          alignItems: "center" as const,
+          justifyContent: "center" as const,
+          alignSelf: "flex-start" as const,
+        },
         pressed && styles.buttonPressed,
       ]}
       accessibilityRole="button"
       accessibilityLabel={isPlaying ? "Stop audio" : "Play audio"}
     >
-      {isPlaying ? <StopIcon /> : <PlayIcon />}
+      {isPlaying ? <StopIcon large={large} /> : <PlayIcon large={large} />}
     </Pressable>
   );
 });
 
-const buttonSize = layout.gridUnit * 5;
-
 const styles = StyleSheet.create({
-  button: {
-    width: buttonSize,
-    height: buttonSize,
-    borderRadius: buttonSize / 2,
-    backgroundColor: "rgba(0,0,0,0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "flex-start",
-    marginTop: layout.gridUnit * 2,
-  },
   buttonPressed: {
     opacity: 0.7,
   },

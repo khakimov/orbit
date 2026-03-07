@@ -1,11 +1,12 @@
 import {
   ClozeTaskContent,
   ClozeTaskContentComponent,
+  isAudioMIMEType,
   QATaskContent,
   TaskContentType,
   TaskProvenance,
 } from "@withorbit/core";
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   FlexStyle,
@@ -17,12 +18,18 @@ import {
 } from "react-native";
 import { ReviewAreaItem } from "../reviewAreaItem.js";
 import { colors, layout, type } from "../styles/index.js";
+import AudioPlayButton from "./AudioPlayButton.jsx";
+import {
+  AttachmentResolution,
+  useAttachmentResolver,
+} from "./AttachmentResolverContext.js";
 import Button from "./Button.jsx";
 import FadeView from "./FadeView.jsx";
 import {
   AnimatedTransitionTiming,
   useTransitioningValue,
 } from "./hooks/useTransitioningValue.js";
+import useWeakRef from "./hooks/useWeakRef.js";
 import CardField, { clozeBlankSentinel } from "./PromptFieldRenderer.js";
 import {
   clozeEndHighlightSentinel,
@@ -209,6 +216,49 @@ type QAPromptRendererType = Omit<CardProps, "reviewItem"> & {
   reviewItem: ReviewAreaItem<QATaskContent>;
 };
 
+function useCardAudio(contents: QATaskContent): {
+  audioURL: string | null;
+  audioSide: "body" | "answer" | null;
+} {
+  const resolver = useAttachmentResolver();
+  const [result, setResult] = useState<{
+    audioURL: string | null;
+    audioSide: "body" | "answer" | null;
+  }>({ audioURL: null, audioSide: null });
+
+  const bodyAttachment = contents.body.attachments[0] ?? null;
+  const answerAttachment = contents.answer.attachments[0] ?? null;
+  const _resolver = useWeakRef(resolver);
+  const pendingRef = useRef(0);
+
+  useEffect(() => {
+    const id = ++pendingRef.current;
+    setResult({ audioURL: null, audioSide: null });
+
+    async function resolve() {
+      for (const [attachmentID, side] of [
+        [bodyAttachment, "body"],
+        [answerAttachment, "answer"],
+      ] as const) {
+        if (!attachmentID) continue;
+        const resolution = await _resolver.current(attachmentID);
+        if (pendingRef.current !== id) return;
+        if (resolution && isAudioMIMEType(resolution.mimeType)) {
+          setResult({ audioURL: resolution.url, audioSide: side });
+          return;
+        }
+      }
+    }
+
+    resolve();
+    return () => {
+      pendingRef.current++;
+    };
+  }, [bodyAttachment, answerAttachment, _resolver]);
+
+  return result;
+}
+
 function QAPromptRenderer({
   backIsRevealed,
   accentColor,
@@ -216,6 +266,9 @@ function QAPromptRenderer({
 }: QAPromptRendererType) {
   const animatingStyles = useAnimatingStyles(backIsRevealed);
   const contents = getQAPromptContents(reviewItem);
+  const { audioURL, audioSide } = useCardAudio(contents);
+  const isAudioOnlyQuestion =
+    audioSide === "body" && !contents.body.text.trim();
 
   const [frontSizeVariantIndex, setFrontSizeVariantIndex] = React.useState<
     number | undefined
@@ -250,7 +303,7 @@ function QAPromptRenderer({
         >
           <CardField
             promptField={contents.body}
-
+            suppressAudio={audioSide === "body"}
             largestSizeVariantIndex={
               frontSizeVariantIndex === undefined
                 ? undefined
@@ -271,7 +324,7 @@ function QAPromptRenderer({
         >
           <CardField
             promptField={contents.answer}
-
+            suppressAudio={audioSide === "answer"}
           />
         </FadeView>
       </FadeView>
@@ -297,11 +350,39 @@ function QAPromptRenderer({
         <View style={{ flex: proportions.unrevealed[1], overflow: "hidden" }}>
           <CardField
             promptField={contents.body}
-
+            suppressAudio={audioSide === "body"}
             onLayout={setFrontSizeVariantIndex}
           />
         </View>
       </FadeView>
+      {audioURL && isAudioOnlyQuestion && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <AudioPlayButton url={audioURL} size="large" />
+        </View>
+      )}
+      {audioURL &&
+        !isAudioOnlyQuestion &&
+        (audioSide === "body" || backIsRevealed) && (
+          <View
+            style={{
+              position: "absolute",
+              bottom: layout.gridUnit,
+              left: 0,
+            }}
+          >
+            <AudioPlayButton url={audioURL} />
+          </View>
+        )}
     </View>
   );
 }
