@@ -235,6 +235,7 @@ function QAPromptRenderer({
           provenance={reviewItem.provenance}
           size="small"
           style={{
+            marginTop: layout.gridUnit * 2,
             marginBottom: layout.gridUnit,
           }}
           accentColor={accentColor}
@@ -244,6 +245,7 @@ function QAPromptRenderer({
             flex: proportions.revealed[0],
             marginBottom: layout.gridUnit,
             width: "66.67%",
+            overflow: "hidden",
           }}
         >
           <CardField
