@@ -292,7 +292,7 @@ function QAPromptRenderer({
             accentColor={accentColor}
           />
         </View>
-        <View style={{ flex: proportions.unrevealed[1] }}>
+        <View style={{ flex: proportions.unrevealed[1], overflow: "hidden" }}>
           <CardField
             promptField={contents.body}
 
